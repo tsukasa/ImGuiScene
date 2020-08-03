@@ -26,11 +26,16 @@ namespace ImGuiScene
         private ImGui_Input_Impl_Direct imguiInput;
 
         public delegate void BuildUIDelegate();
+        public delegate void NewInputFrameDelegate();
+        public delegate void NewRenderFrameDelegate();
 
         /// <summary>
         /// User methods invoked every ImGui frame to construct custom UIs.
         /// </summary>
         public BuildUIDelegate OnBuildUI;
+
+        public NewInputFrameDelegate OnNewInputFrame;
+        public NewRenderFrameDelegate OnNewRenderFrame;
 
         private string imguiIniPath = null;
         public string ImGuiIniPath
@@ -100,17 +105,43 @@ namespace ImGuiScene
             this.deviceContext.OutputMerger.SetRenderTargets(this.rtv);
 
             this.imguiRenderer.NewFrame();
-            // could (should?) grab size every frame, or ideally handle resize somehow
-            // but as long as we pretend we don't resize, this should be fine
+            this.OnNewRenderFrame?.Invoke();
             this.imguiInput.NewFrame(targetWidth, targetHeight);
+            this.OnNewInputFrame?.Invoke();
 
             ImGui.NewFrame();
-                OnBuildUI?.Invoke();
+            OnBuildUI?.Invoke();
             ImGui.Render();
 
             this.imguiRenderer.RenderDrawData(ImGui.GetDrawData());
 
             this.deviceContext.OutputMerger.SetRenderTargets((RenderTargetView)null);
+        }
+
+        public void OnPreResize()
+        {
+            this.deviceContext.OutputMerger.SetRenderTargets((RenderTargetView)null);
+
+            this.rtv?.Dispose();
+            this.rtv = null;
+        }
+
+        public void OnPostResize(int newWidth, int newHeight)
+        {
+            using (var backbuffer = this.swapChain.GetBackBuffer<Texture2D>(0))
+            {
+                this.rtv = new RenderTargetView(this.device, backbuffer);
+            }
+
+            this.targetWidth = newWidth;
+            this.targetHeight = newHeight;
+        }
+
+        // It is pretty much required that this is called from a handler attached
+        // to OnNewRenderFrame
+        public void InvalidateFonts()
+        {
+            this.imguiRenderer.RebuildFontTexture();
         }
 
         public bool IsImGuiCursor(IntPtr hCursor)
@@ -138,9 +169,24 @@ namespace ImGuiScene
             }
         }
 
+        public unsafe TextureWrap LoadImageRaw(byte[] imageData, int width, int height, int numChannels = 4)
+        {
+            // StbiSharp doesn't expose a constructor, even just to wrap existing data, which means
+            // short of something awful like below, or creating another wrapper layer, we can't avoid
+            // adding divergent code paths into CreateTexture
+            //var mock = new { Width = width, Height = height, NumChannels = numChannels, Data = imageData };
+            //var image = Unsafe.As<StbiImage>(mock);
+            //return LoadImage_Internal(image);
+
+            fixed (void* pixelData = imageData)
+            {
+                return CreateTexture(pixelData, width, height, numChannels);
+            }
+        }
+
         private unsafe TextureWrap LoadImage_Internal(StbiImage image)
         {
-            fixed (void *pixelData = image.Data)
+            fixed (void* pixelData = image.Data)
             {
                 return CreateTexture(pixelData, image.Width, image.Height, image.NumChannels);
             }
@@ -156,7 +202,7 @@ namespace ImGuiScene
                 Height = height,
                 MipLevels = 1,
                 ArraySize = 1,
-                Format = Format.R8G8B8A8_UNorm,    // TODO - support other formats?
+                Format = Format.R8G8B8A8_UNorm,
                 SampleDescription = new SampleDescription(1, 0),
                 Usage = ResourceUsage.Immutable,
                 BindFlags = BindFlags.ShaderResource,
@@ -241,8 +287,8 @@ namespace ImGuiScene
                     // TODO: dispose managed state (managed objects).
                 }
 
-                this.imguiRenderer.Shutdown();
-                this.imguiInput.Dispose();
+                this.imguiRenderer?.Shutdown();
+                this.imguiInput?.Dispose();
 
                 ImGui.DestroyContext();
 
@@ -250,9 +296,9 @@ namespace ImGuiScene
 
                 // Not actually sure how sharpdx does ref management, but hopefully they
                 // addref when we create our wrappers, so this should just release that count
-                this.swapChain.Dispose();
-                this.deviceContext.Dispose();
-                this.device.Dispose();
+                this.swapChain?.Dispose();
+                this.deviceContext?.Dispose();
+                this.device?.Dispose();
 
                 disposedValue = true;
             }
