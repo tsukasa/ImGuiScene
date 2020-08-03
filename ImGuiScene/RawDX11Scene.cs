@@ -287,8 +287,8 @@ namespace ImGuiScene
                     // TODO: dispose managed state (managed objects).
                 }
 
-                this.imguiRenderer.Shutdown();
-                this.imguiInput.Dispose();
+                this.imguiRenderer?.Shutdown();
+                this.imguiInput?.Dispose();
 
                 ImGui.DestroyContext();
 
@@ -296,9 +296,9 @@ namespace ImGuiScene
 
                 // Not actually sure how sharpdx does ref management, but hopefully they
                 // addref when we create our wrappers, so this should just release that count
-                this.swapChain.Dispose();
-                this.deviceContext.Dispose();
-                this.device.Dispose();
+                this.swapChain?.Dispose();
+                this.deviceContext?.Dispose();
+                this.device?.Dispose();
 
                 disposedValue = true;
             }
