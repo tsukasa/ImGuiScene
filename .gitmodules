@@ -3,4 +3,4 @@
 	url = https://github.com/ff-meli/SDL2-CS
 [submodule "deps/ImGui.NET"]
 	path = deps/ImGui.NET
-	url = https://github.com/ff-meli/ImGui.NET
+	url = https://github.com/goatcorp/ImGui.NET

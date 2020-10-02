@@ -125,6 +125,36 @@ namespace ImGuiScene
             {
                 UpdateMouseCursor();
             }
+
+            // From ImGui's FAQ:
+            // Note: Text input widget releases focus on "Return KeyDown", so the subsequent "Return KeyUp" event
+            // that your application receive will typically have io.WantCaptureKeyboard == false. Depending on your
+            // application logic it may or not be inconvenient.
+            //
+            // With how the local wndproc works, this causes the key up event to be missed when exiting ImGui text entry
+            // (eg, from hitting enter or escape.  There may be other ways as well)
+            // This then causes the key to appear 'stuck' down, which breaks subsequent attempts to use the input field.
+            // This is something of a brute force fix that basically makes key up events irrelevant
+            // Holding a key will send repeated key down events and (re)set these where appropriate, so this should be ok.
+            if (!io.WantTextInput)
+            {
+                for (int i = 0; i < io.KeysDown.Count; i++)
+                {
+                    io.KeysDown[i] = false;
+                }
+            }
+
+            // Similar issue seen with overlapping mouse clicks
+            // eg, right click and hold on imgui window, drag off, left click and hold
+            //   release right click, release left click -> right click was 'stuck' and imgui
+            //   would become unresponsive
+            if (!io.WantCaptureMouse)
+            {
+                for (int i = 0; i < io.MouseDown.Count; i++)
+                {
+                    io.MouseDown[i] = false;
+                }
+            }
         }
 
         public void SetIniPath(string iniPath)
@@ -193,7 +223,7 @@ namespace ImGuiScene
 
         private long WndProcDetour(IntPtr hWnd, uint msg, ulong wParam, long lParam)
         {
-            if (hWnd == _hWnd && ImGui.GetCurrentContext() != IntPtr.Zero && (ImGui.GetIO().WantCaptureMouse || ImGui.GetIO().WantCaptureKeyboard))
+            if (hWnd == _hWnd && ImGui.GetCurrentContext() != IntPtr.Zero && (ImGui.GetIO().WantCaptureMouse || ImGui.GetIO().WantTextInput))
             {
                 var io = ImGui.GetIO();
                 var wmsg = (WindowsMessage)msg;
@@ -288,7 +318,7 @@ namespace ImGuiScene
 
                     case WindowsMessage.WM_KEYDOWN:
                     case WindowsMessage.WM_SYSKEYDOWN:
-                        if (io.WantCaptureKeyboard)
+                        if (io.WantTextInput)
                         {
                             if (wParam < 256)
                             {
@@ -300,7 +330,7 @@ namespace ImGuiScene
 
                     case WindowsMessage.WM_KEYUP:
                     case WindowsMessage.WM_SYSKEYUP:
-                        if (io.WantCaptureKeyboard)
+                        if (io.WantTextInput)
                         {
                             if (wParam < 256)
                             {
@@ -311,7 +341,7 @@ namespace ImGuiScene
                         break;
 
                     case WindowsMessage.WM_CHAR:
-                        if (io.WantCaptureKeyboard)
+                        if (io.WantTextInput)
                         {
                             io.AddInputCharacter((uint)wParam);
                             return 0;
