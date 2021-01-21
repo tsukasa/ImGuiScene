@@ -1,4 +1,4 @@
-﻿using ImGuiNET;
+using ImGuiNET;
 using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
@@ -14,11 +14,13 @@ namespace ImGuiScene
     // now it should be directly useable
     public sealed class RawDX11Scene : IDisposable
     {
-        private Device device;
+        public Device Device { get; private set; }
+        public IntPtr WindowHandlePtr { get; private set; }
+
         private SwapChain swapChain;
         private DeviceContext deviceContext;
         private RenderTargetView rtv;
-        private IntPtr hWnd;
+        
         private int targetWidth;
         private int targetHeight;
 
@@ -51,7 +53,7 @@ namespace ImGuiScene
         public RawDX11Scene(IntPtr nativeSwapChain)
         {
             this.swapChain = new SwapChain(nativeSwapChain);
-            this.device = swapChain.GetDevice<Device>();
+            this.Device = swapChain.GetDevice<Device>();
 
             Initialize();
         }
@@ -66,7 +68,7 @@ namespace ImGuiScene
         // By passing in the hooked version explicitly here, we can mostly play nice with debug tools
         public RawDX11Scene(IntPtr nativeDevice, IntPtr nativeSwapChain)
         {
-            this.device = new Device(nativeDevice);
+            this.Device = new Device(nativeDevice);
             this.swapChain = new SwapChain(nativeSwapChain);
 
             Initialize();
@@ -74,18 +76,18 @@ namespace ImGuiScene
 
         private void Initialize()
         {
-            this.deviceContext = this.device.ImmediateContext;
+            this.deviceContext = this.Device.ImmediateContext;
 
             using (var backbuffer = this.swapChain.GetBackBuffer<Texture2D>(0))
             {
-                this.rtv = new RenderTargetView(this.device, backbuffer);
+                this.rtv = new RenderTargetView(this.Device, backbuffer);
             }
 
-            // could also do things with GetClientRect() for hWnd, not sure if that is necessary
+            // could also do things with GetClientRect() for WindowHandlePtr, not sure if that is necessary
             this.targetWidth = this.swapChain.Description.ModeDescription.Width;
             this.targetHeight = this.swapChain.Description.ModeDescription.Height;
 
-            this.hWnd = this.swapChain.Description.OutputHandle;
+            this.WindowHandlePtr = this.swapChain.Description.OutputHandle;
 
             InitializeImGui();
         }
@@ -96,8 +98,8 @@ namespace ImGuiScene
 
             ImGui.CreateContext();
 
-            this.imguiInput = new ImGui_Input_Impl_Direct(hWnd);
-            this.imguiRenderer.Init(this.device, this.deviceContext);
+            this.imguiInput = new ImGui_Input_Impl_Direct(WindowHandlePtr);
+            this.imguiRenderer.Init(this.Device, this.deviceContext);
         }
 
         public void Render()
@@ -130,7 +132,7 @@ namespace ImGuiScene
         {
             using (var backbuffer = this.swapChain.GetBackBuffer<Texture2D>(0))
             {
-                this.rtv = new RenderTargetView(this.device, backbuffer);
+                this.rtv = new RenderTargetView(this.Device, backbuffer);
             }
 
             this.targetWidth = newWidth;
@@ -210,9 +212,9 @@ namespace ImGuiScene
                 OptionFlags = ResourceOptionFlags.None
             };
 
-            using (var texture = new Texture2D(this.device, texDesc, new DataRectangle(new IntPtr(pixelData), width * bytesPerPixel)))
+            using (var texture = new Texture2D(this.Device, texDesc, new DataRectangle(new IntPtr(pixelData), width * bytesPerPixel)))
             {
-                resView = new ShaderResourceView(this.device, texture, new ShaderResourceViewDescription
+                resView = new ShaderResourceView(this.Device, texture, new ShaderResourceViewDescription
                 {
                     Format = texDesc.Format,
                     Dimension = ShaderResourceViewDimension.Texture2D,
@@ -235,7 +237,7 @@ namespace ImGuiScene
                 desc.OptionFlags = ResourceOptionFlags.None;
                 desc.BindFlags = BindFlags.None;
 
-                using (var tex = new Texture2D(this.device, desc))
+                using (var tex = new Texture2D(this.Device, desc))
                 {
                     this.deviceContext.CopyResource(backBuffer, tex);
                     using (var surf = tex.QueryInterface<Surface>())
@@ -298,7 +300,7 @@ namespace ImGuiScene
                 // addref when we create our wrappers, so this should just release that count
                 this.swapChain?.Dispose();
                 this.deviceContext?.Dispose();
-                this.device?.Dispose();
+                this.Device?.Dispose();
 
                 disposedValue = true;
             }
