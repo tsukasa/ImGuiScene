@@ -1,4 +1,4 @@
-﻿using ImGuiNET;
+using ImGuiNET;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -42,7 +42,7 @@ namespace ImGuiScene
                 io.NativePtr->BackendPlatformName = (byte*)_platformNamePtr.ToPointer();
             }
 
-            io.ImeWindowHandle = _hWnd;
+            //io.ImeWindowHandle = _hWnd;
 
             io.KeyMap[(int)ImGuiKey.Tab] = (int)VirtualKey.Tab;
             io.KeyMap[(int)ImGuiKey.LeftArrow] = (int)VirtualKey.Left;

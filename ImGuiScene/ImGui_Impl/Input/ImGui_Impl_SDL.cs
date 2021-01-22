@@ -1,4 +1,4 @@
-﻿using ImGuiNET;
+using ImGuiNET;
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -89,7 +89,9 @@ namespace ImGuiScene
             var sysWmInfo = new SDL_SysWMinfo();
             SDL_GetVersion(out sysWmInfo.version);
             SDL_GetWindowWMInfo(_sdlWindow, ref sysWmInfo);
-            io.ImeWindowHandle = sysWmInfo.info.win.window;
+
+            // TODO: This does not exist in newer ImGui versions
+            //io.ImeWindowHandle = sysWmInfo.info.win.window;
         }
 
         public void NewFrame(int width, int height)
