@@ -1,4 +1,4 @@
-﻿using ImGuiNET;
+using ImGuiNET;
 using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
@@ -22,8 +22,7 @@ namespace ImGuiScene
     /// https://github.com/GPUOpen-LibrariesAndSDKs/CrossfireAPI11/blob/master/amd_lib/src/AMD_SaveRestoreState.cpp
     /// Would be nice to organize it better, but it seems to work
     /// </summary>
-    public class ImGui_Impl_DX11 : IImGuiRenderer
-    {
+    public class ImGui_Impl_DX11 : IImGuiRenderer {
         private IntPtr _renderNamePtr;
         private Device _device;
         private DeviceContext _deviceContext;
@@ -658,7 +657,7 @@ namespace ImGuiScene
 
         public void Init(params object[] initParams)
         {
-            ImGui.GetIO().BackendFlags = ImGui.GetIO().BackendFlags | ImGuiBackendFlags.RendererHasVtxOffset;
+            ImGui.GetIO().BackendFlags = ImGui.GetIO().BackendFlags | ImGuiBackendFlags.RendererHasVtxOffset | ImGuiBackendFlags.RendererHasViewports;
 
             // BackendRendererName is readonly (and null) in ImGui.NET for some reason, but we can hack it via its internal pointer
             _renderNamePtr = Marshal.StringToHGlobalAnsi("imgui_impl_dx11_c#");
@@ -670,11 +669,14 @@ namespace ImGuiScene
             _device = (Device)initParams[0];
             _deviceContext = (DeviceContext)initParams[1];
 
+            InitPlatformInterface();
+            
             // SharpDX also doesn't allow reference managment
         }
 
         public void Shutdown()
         {
+            ShutdownPlatformInterface();
             InvalidateDeviceObjects();
 
             // we don't own these, so no Dispose()
@@ -695,5 +697,143 @@ namespace ImGuiScene
                 CreateDeviceObjects();
             }
         }
+        
+        /** Viewport support **/
+        private struct ImGuiViewportDataDx11 {
+            public IntPtr SwapChain;
+            public IntPtr View;
+        }
+        
+        // Viewport interface
+        private delegate void CreateWindowDelegate(ImGuiViewportPtr ptr);
+        private delegate void DestroyWindowDelegate(ImGuiViewportPtr ptr);
+        private delegate void SetWindowSizeDelegate(ImGuiViewportPtr ptr, Vector2 size);
+        private delegate void RenderWindowDelegate(ImGuiViewportPtr ptr, IntPtr v);
+        private delegate void SwapBuffersDelegate(ImGuiViewportPtr ptr, IntPtr v);
+
+        private CreateWindowDelegate _createWindow;
+        private DestroyWindowDelegate _destroyWindow;
+        private SetWindowSizeDelegate _setWindowSize;
+        private RenderWindowDelegate _renderWindow;
+        private SwapBuffersDelegate _swapBuffers;
+
+        private void InitPlatformInterface() {
+            ImGuiPlatformIOPtr ptr = ImGui.GetPlatformIO();
+            _createWindow = CreateWindow;
+            _destroyWindow = DestroyWindow;
+            _setWindowSize = SetWindowSize;
+            _renderWindow = RenderWindow;
+            _swapBuffers = SwapBuffers;
+
+            ptr.Renderer_CreateWindow = Marshal.GetFunctionPointerForDelegate(_createWindow);
+            ptr.Renderer_DestroyWindow = Marshal.GetFunctionPointerForDelegate(_destroyWindow);
+            ptr.Renderer_SetWindowSize = Marshal.GetFunctionPointerForDelegate(_setWindowSize);
+            ptr.Renderer_RenderWindow = Marshal.GetFunctionPointerForDelegate(_renderWindow);
+            ptr.Renderer_SwapBuffers = Marshal.GetFunctionPointerForDelegate(_swapBuffers);
+        }
+
+        private void ShutdownPlatformInterface() {
+            ImGui.DestroyPlatformWindows();    
+        }
+
+        // Viewport functions
+        public void CreateWindow(ImGuiViewportPtr viewport) {
+            ImGuiViewportDataDx11 data = new ImGuiViewportDataDx11();
+
+            // PlatformHandleRaw should always be a HWND, whereas PlatformHandle might be a higher-level handle (e.g. GLFWWindow*, SDL_Window*).
+            // Some backend will leave PlatformHandleRaw NULL, in which case we assume PlatformHandle will contain the HWND.
+            IntPtr hWnd = viewport.PlatformHandleRaw;
+            if (hWnd == IntPtr.Zero)
+                hWnd = viewport.PlatformHandle;
+
+            // Create swapchain
+            SwapChainDescription desc = new SwapChainDescription
+            {
+                ModeDescription = new ModeDescription
+                {
+                    Width = 0,
+                    Height = 0,
+                    Format = Format.R8G8B8A8_UNorm,
+                },
+                SampleDescription = new SampleDescription
+                {
+                    Count = 1,
+                    Quality = 0
+                },
+                Usage = Usage.RenderTargetOutput,
+                BufferCount = 1,
+                OutputHandle = hWnd,
+                IsWindowed = true,
+                SwapEffect = SwapEffect.Discard,
+                Flags = SwapChainFlags.None
+            };
+            
+            // Create a swapchain using the existing game hardware (I think)
+            using (var dxgi = _device.QueryInterface<SharpDX.DXGI.Device>())
+            using (var adapter = dxgi.Adapter)
+            using (var factory = adapter.GetParent<Factory>())
+            {
+                data.SwapChain = new SwapChain(factory, _device, desc).NativePointer;
+            }
+
+            // Create the render target view
+            using (var backbuffer = new SwapChain(data.SwapChain).GetBackBuffer<Texture2D>(0))
+                data.View = new RenderTargetView(_device, backbuffer).NativePointer;
+
+            // Save data in renderer data
+            IntPtr dataPtr = IntPtr.Zero;
+            dataPtr = Marshal.AllocHGlobal(Marshal.SizeOf(data));
+            Marshal.StructureToPtr(data, dataPtr, false);
+            viewport.RendererUserData = dataPtr;
+        }
+        
+        public void DestroyWindow(ImGuiViewportPtr viewport) {
+
+            // This is also called on the main viewport for some reason, and we never set that viewport's RendererUserData
+            if (viewport.RendererUserData == IntPtr.Zero) return;
+
+            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
+
+            new SwapChain(data.SwapChain).Dispose();
+            new RenderTargetView(data.View).Dispose();
+            data.SwapChain = IntPtr.Zero;
+            data.View = IntPtr.Zero;
+
+            Marshal.FreeHGlobal(viewport.RendererUserData);
+            viewport.RendererUserData = IntPtr.Zero;
+        }
+        
+        public void SetWindowSize(ImGuiViewportPtr viewport, Vector2 size) {
+            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
+            
+            // Delete our existing view
+            new RenderTargetView(data.View).Dispose();
+            var tmpSwap = new SwapChain(data.SwapChain);
+            
+            // Resize buffers and recreate view
+            tmpSwap.ResizeBuffers(1, (int) size.X, (int) size.Y, Format.Unknown, SwapChainFlags.None);
+            using (var backbuffer = tmpSwap.GetBackBuffer<Texture2D>(0))
+                data.View = new RenderTargetView(_device, backbuffer).NativePointer;
+            
+            // We changed rtv's native pointer, so we have to update it
+            viewport.RendererUserData = MemUtil.ToPointer<ImGuiViewportDataDx11>(data);
+        }
+        
+        public void RenderWindow(ImGuiViewportPtr viewport, IntPtr v) {
+            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
+
+            var tmpRtv = new RenderTargetView(data.View);
+            this._deviceContext.OutputMerger.SetTargets(tmpRtv);
+            if ((viewport.Flags & ImGuiViewportFlags.NoRendererClear) != ImGuiViewportFlags.NoRendererClear)
+                this._deviceContext.ClearRenderTargetView(tmpRtv, new RawColor4(0f, 0f, 0f, 1f));
+            RenderDrawData(viewport.DrawData);
+        }
+        
+        public void SwapBuffers(ImGuiViewportPtr viewport, IntPtr v) {
+            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
+
+            new SwapChain(data.SwapChain).Present(0, PresentFlags.None);
+        }
+        
     }
 }
