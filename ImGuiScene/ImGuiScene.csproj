@@ -82,7 +82,7 @@
     <Content Include="FodyWeavers.xml" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\..\..\ImGui.NET\src\ImGui.NET-472\ImGui.NET-472.csproj">
+    <ProjectReference Include="..\deps\ImGui.NET\src\ImGui.NET-472\ImGui.NET-472.csproj">
       <Project>{0483026e-c6ce-4b1a-aa68-46544c08140b}</Project>
       <Name>ImGui.NET-472</Name>
     </ProjectReference>
