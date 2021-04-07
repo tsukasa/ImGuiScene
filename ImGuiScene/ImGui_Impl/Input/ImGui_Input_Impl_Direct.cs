@@ -769,7 +769,6 @@ namespace ImGuiScene
                     ImGuiViewportFlags.NoFocusOnClick |
                     ImGuiViewportFlags.NoRendererClear |
                     ImGuiViewportFlags.NoFocusOnAppearing |
-                    ImGuiViewportFlags.TopMost |
                     viewport.Flags
                 );
 
