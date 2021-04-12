@@ -188,19 +188,46 @@ namespace ImGuiScene
         {
             var io = ImGui.GetIO();
 
-            if (io.WantSetMousePos)
+            // Depending on if Viewports are enabled, we have to change how we process
+            // the cursor position. If viewports are enabled, we pass the absolute cursor
+            // position to ImGui. Otherwise, we use the old method of passing client-local
+            // mouse position to ImGui.
+            if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable))
             {
-                Win32.SetCursorPos((int) io.MousePos.X, (int) io.MousePos.Y);
-            }
+                if (io.WantSetMousePos)
+                {
+                    Win32.SetCursorPos((int) io.MousePos.X, (int) io.MousePos.Y);
+                }
 
-            if (Win32.GetCursorPos(out Win32.POINT pt))
+                if (Win32.GetCursorPos(out Win32.POINT pt))
+                {
+                    io.MousePos.X = pt.X;
+                    io.MousePos.Y = pt.Y;
+                } else
+                {
+                    io.MousePos.X = float.MinValue;
+                    io.MousePos.Y = float.MinValue;
+                }
+            }
+            else
             {
-                io.MousePos.X = pt.X;
-                io.MousePos.Y = pt.Y;
-            } else
-            {
-                io.MousePos.X = float.MinValue;
-                io.MousePos.Y = float.MinValue;
+                if (io.WantSetMousePos)
+                {
+                    var pos = new Win32.POINT { X = (int)io.MousePos.X, Y = (int)io.MousePos.Y };
+                    Win32.ClientToScreen(_hWnd, ref pos);
+                    Win32.SetCursorPos(pos.X, pos.Y);
+                }
+                
+                if (Win32.GetCursorPos(out Win32.POINT pt) && Win32.ScreenToClient(_hWnd, ref pt))
+                {
+                    io.MousePos.X = pt.X;
+                    io.MousePos.Y = pt.Y;
+                }
+                else
+                {
+                    io.MousePos.X = float.MinValue;
+                    io.MousePos.Y = float.MinValue;
+                }
             }
         }
 
