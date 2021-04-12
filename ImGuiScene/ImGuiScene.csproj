@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -64,6 +64,7 @@
     <Compile Include="ImGui_Impl\Input\ImGui_Impl_SDL.cs" />
     <Compile Include="Renderers\RendererFactory.cs" />
     <Compile Include="Win32 Utils\Constants.cs" />
+    <Compile Include="Win32 Utils\MemUtil.cs" />
     <Compile Include="Win32 Utils\Win32.cs" />
     <Compile Include="Windowing\WindowFactory.cs" />
     <Compile Include="Windowing\SDLWindowGL.cs" />
@@ -101,6 +102,22 @@
     </PackageReference>
     <PackageReference Include="OpenGL.Net">
       <Version>0.8.4</Version>
+    </PackageReference>
+    <PackageReference Include="PInvoke.DwmApi">
+      <Version>0.7.104</Version>
+        <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="PInvoke.Kernel32">
+      <Version>0.7.104</Version>
+        <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="PInvoke.User32">
+      <Version>0.7.104</Version>
+        <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="PInvoke.Win32">
+      <Version>0.7.104</Version>
+        <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="SharpDX.Direct3D11">
       <Version>4.2.0</Version>

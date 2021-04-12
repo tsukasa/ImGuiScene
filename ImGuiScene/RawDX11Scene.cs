@@ -16,8 +16,8 @@ namespace ImGuiScene
     {
         public Device Device { get; private set; }
         public IntPtr WindowHandlePtr { get; private set; }
+        public SwapChain SwapChain { get; private set; }
 
-        private SwapChain swapChain;
         private DeviceContext deviceContext;
         private RenderTargetView rtv;
         
@@ -52,8 +52,8 @@ namespace ImGuiScene
 
         public RawDX11Scene(IntPtr nativeSwapChain)
         {
-            this.swapChain = new SwapChain(nativeSwapChain);
-            this.Device = swapChain.GetDevice<Device>();
+            this.SwapChain = new SwapChain(nativeSwapChain);
+            this.Device = SwapChain.GetDevice<Device>();
 
             Initialize();
         }
@@ -69,7 +69,7 @@ namespace ImGuiScene
         public RawDX11Scene(IntPtr nativeDevice, IntPtr nativeSwapChain)
         {
             this.Device = new Device(nativeDevice);
-            this.swapChain = new SwapChain(nativeSwapChain);
+            this.SwapChain = new SwapChain(nativeSwapChain);
 
             Initialize();
         }
@@ -78,16 +78,16 @@ namespace ImGuiScene
         {
             this.deviceContext = this.Device.ImmediateContext;
 
-            using (var backbuffer = this.swapChain.GetBackBuffer<Texture2D>(0))
+            using (var backbuffer = this.SwapChain.GetBackBuffer<Texture2D>(0))
             {
                 this.rtv = new RenderTargetView(this.Device, backbuffer);
             }
 
             // could also do things with GetClientRect() for WindowHandlePtr, not sure if that is necessary
-            this.targetWidth = this.swapChain.Description.ModeDescription.Width;
-            this.targetHeight = this.swapChain.Description.ModeDescription.Height;
+            this.targetWidth = this.SwapChain.Description.ModeDescription.Width;
+            this.targetHeight = this.SwapChain.Description.ModeDescription.Height;
 
-            this.WindowHandlePtr = this.swapChain.Description.OutputHandle;
+            this.WindowHandlePtr = this.SwapChain.Description.OutputHandle;
 
             InitializeImGui();
         }
@@ -98,8 +98,10 @@ namespace ImGuiScene
 
             ImGui.CreateContext();
 
-            this.imguiInput = new ImGui_Input_Impl_Direct(WindowHandlePtr);
+            ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable | ImGuiConfigFlags.ViewportsEnable;
+
             this.imguiRenderer.Init(this.Device, this.deviceContext);
+            this.imguiInput = new ImGui_Input_Impl_Direct(WindowHandlePtr);
         }
 
         public void Render()
@@ -116,8 +118,9 @@ namespace ImGuiScene
             ImGui.Render();
 
             this.imguiRenderer.RenderDrawData(ImGui.GetDrawData());
-
             this.deviceContext.OutputMerger.SetRenderTargets((RenderTargetView)null);
+            ImGui.UpdatePlatformWindows();
+            ImGui.RenderPlatformWindowsDefault();
         }
 
         public void OnPreResize()
@@ -130,7 +133,7 @@ namespace ImGuiScene
 
         public void OnPostResize(int newWidth, int newHeight)
         {
-            using (var backbuffer = this.swapChain.GetBackBuffer<Texture2D>(0))
+            using (var backbuffer = this.SwapChain.GetBackBuffer<Texture2D>(0))
             {
                 this.rtv = new RenderTargetView(this.Device, backbuffer);
             }
@@ -229,7 +232,7 @@ namespace ImGuiScene
 
         public byte[] CaptureScreenshot()
         {
-            using (var backBuffer = this.swapChain.GetBackBuffer<Texture2D>(0))
+            using (var backBuffer = this.SwapChain.GetBackBuffer<Texture2D>(0))
             {
                 Texture2DDescription desc = backBuffer.Description;
                 desc.CpuAccessFlags = CpuAccessFlags.Read;
@@ -298,9 +301,13 @@ namespace ImGuiScene
 
                 // Not actually sure how sharpdx does ref management, but hopefully they
                 // addref when we create our wrappers, so this should just release that count
-                this.swapChain?.Dispose();
-                this.deviceContext?.Dispose();
-                this.Device?.Dispose();
+
+                // Originally it was thought these lines were needed because it was assumed that SharpDX does
+                // proper refcounting to handle disposing, but disposing these would cause the game to crash
+                // on resizing after unloading Dalamud
+                // this.SwapChain?.Dispose();
+                // this.deviceContext?.Dispose();
+                // this.Device?.Dispose();
 
                 disposedValue = true;
             }
