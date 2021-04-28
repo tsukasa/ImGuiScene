@@ -27,6 +27,8 @@ namespace ImGuiScene
         // private ImGuiMouseCursor _oldCursor = ImGuiMouseCursor.None;
         private IntPtr[] _cursors;
 
+        public bool UpdateCursor { get; set; } = true;
+
         public unsafe ImGui_Input_Impl_Direct(IntPtr hWnd)
         {
             _hWnd = hWnd;
@@ -130,7 +132,7 @@ namespace ImGuiScene
             //}
 
             // hacky attempt to make cursors work how I think they 'should'
-            if (io.WantCaptureMouse || io.MouseDrawCursor)
+            if ((io.WantCaptureMouse || io.MouseDrawCursor) && UpdateCursor)
             {
                 UpdateMouseCursor();
             }

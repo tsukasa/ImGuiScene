@@ -18,6 +18,12 @@ namespace ImGuiScene
         public IntPtr WindowHandlePtr { get; private set; }
         public SwapChain SwapChain { get; private set; }
 
+        public bool UpdateCursor
+        {
+            get => this.imguiInput.UpdateCursor;
+            set => this.imguiInput.UpdateCursor = value;
+        }
+
         private DeviceContext deviceContext;
         private RenderTargetView rtv;
         
