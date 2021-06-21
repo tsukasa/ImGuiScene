@@ -1,6 +1,6 @@
 [submodule "deps/SDL2-CS"]
 	path = deps/SDL2-CS
-	url = https://github.com/goatcorp/SDL2-CS
+	url = https://github.com/daemitus/SDL2-CS
 [submodule "deps/ImGui.NET"]
 	path = deps/ImGui.NET
-	url = https://github.com/goatcorp/ImGui.NET
+	url = https://github.com/daemitus/ImGui.NET

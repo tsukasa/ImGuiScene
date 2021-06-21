@@ -7,9 +7,10 @@ namespace ImGuiScene
     // Even though we are importing PInvoke stuff from Nuget, we still need this class
     // for some APIs that do not seem to be exposed in any way through those packages.
     // In the future, we may be able to use https://github.com/microsoft/cswin32
-    class Win32
+    internal class Win32
     {
-        public enum ImeCommand {
+        public enum ImeCommand
+        {
             IMN_CLOSESTATUSWINDOW = 0x0001,
             IMN_OPENSTATUSWINDOW = 0x0002,
             IMN_CHANGECANDIDATE = 0x0003,
@@ -33,7 +34,8 @@ namespace ImGuiScene
             public int X;
             public int Y;
 
-            public POINT(int X, int Y) {
+            public POINT(int X, int Y)
+            {
                 this.X = X;
                 this.Y = Y;
             }
@@ -49,13 +51,15 @@ namespace ImGuiScene
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct RECT {
+        public struct RECT
+        {
             public int left;
             public int top;
             public int right;
             public int bottom;
 
-            public RECT(int left, int top, int right, int bottom) {
+            public RECT(int left, int top, int right, int bottom)
+            {
                 this.left = left;
                 this.top = top;
                 this.right = right;
@@ -64,12 +68,14 @@ namespace ImGuiScene
         }
 
         [StructLayout(LayoutKind.Sequential)]
-        public struct COMPOSITIONFORM {
+        public struct COMPOSITIONFORM
+        {
             public uint dwStyle;
             public POINT ptCurrentPos;
             public RECT rcArea;
 
-            public COMPOSITIONFORM(uint dwStyle, POINT ptCurrentPos, RECT rcArea) {
+            public COMPOSITIONFORM(uint dwStyle, POINT ptCurrentPos, RECT rcArea)
+            {
                 this.dwStyle = dwStyle;
                 this.ptCurrentPos = ptCurrentPos;
                 this.rcArea = rcArea;
@@ -120,7 +126,7 @@ namespace ImGuiScene
 
         [DllImport("dwmapi.dll")]
         public static extern int DwmIsCompositionEnabled(out bool enabled);
-        [DllImport("user32.dll", SetLastError=true)]
+        [DllImport("user32.dll", SetLastError = true)]
         public static extern bool BringWindowToTop(IntPtr hWnd);
         [DllImport("user32.dll", SetLastError = true)]
         public static extern IntPtr SetFocus(IntPtr hWnd);

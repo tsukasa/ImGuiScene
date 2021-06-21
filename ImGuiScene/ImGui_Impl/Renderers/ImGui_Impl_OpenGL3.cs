@@ -1,12 +1,11 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Numerics;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Text;
 using ImGuiNET;
-using OpenGL;
+using Silk.NET.OpenGL;
 
 namespace ImGuiScene
 {
@@ -17,6 +16,8 @@ namespace ImGuiScene
     /// </summary>
     public class ImGui_Impl_OpenGL3 : IImGuiRenderer
     {
+        private static GL Gl = Util.Gl;
+
         private IntPtr _renderNamePtr;
         private uint _vertHandle;
         private uint _fragHandle;
@@ -54,14 +55,14 @@ namespace ImGuiScene
             // is not nearly as terrible as the DX11 version was, I am leaving this in place for now.
             Gl.GetInteger(GetPName.ActiveTexture, out int lastActiveTexture);
             Gl.GetInteger(GetPName.CurrentProgram, out int lastProgram);
-            Gl.GetInteger(GetPName.TextureBinding2d, out int lastTexture);
+            Gl.GetInteger(GetPName.TextureBinding2D, out int lastTexture);
             Gl.GetInteger(GetPName.ArrayBufferBinding, out int lastArrayBuffer);
             Gl.GetInteger(GetPName.VertexArrayBinding, out int lastVertexArrayObject);
             Gl.GetInteger(GetPName.PolygonMode, out int lastPolygonMode);
             var lastViewport = new int[4];
-            Gl.Get(GetPName.Viewport, lastViewport);
+            Gl.GetInteger(GetPName.Viewport, lastViewport);
             var lastScissorBox = new int[4];
-            Gl.Get(GetPName.ScissorBox, lastScissorBox);
+            Gl.GetInteger(GetPName.ScissorBox, lastScissorBox);
             Gl.GetInteger(GetPName.BlendSrcRgb, out int lastBlendSrcRgb);
             Gl.GetInteger(GetPName.BlendDstRgb, out int lastBlendDstRgb);
             Gl.GetInteger(GetPName.BlendSrcAlpha, out int lastBlendSrcAlpha);
@@ -91,8 +92,8 @@ namespace ImGuiScene
 
                 // Upload vertex/index buffers
                 // TODO: this is *awful*
-                Gl.BufferData(BufferTarget.ArrayBuffer, (uint)(cmdList.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>()), cmdList.VtxBuffer.Data, BufferUsage.StreamDraw);
-                Gl.BufferData(BufferTarget.ElementArrayBuffer, (uint)(cmdList.IdxBuffer.Size * sizeof(ushort)), cmdList.IdxBuffer.Data, BufferUsage.StreamDraw);
+                Gl.BufferData(BufferTargetARB.ArrayBuffer, (uint)(cmdList.VtxBuffer.Size * Unsafe.SizeOf<ImDrawVert>()), cmdList.VtxBuffer.Data, BufferUsageARB.StreamDraw);
+                Gl.BufferData(BufferTargetARB.ElementArrayBuffer, (uint)(cmdList.IdxBuffer.Size * sizeof(ushort)), cmdList.IdxBuffer.Data, BufferUsageARB.StreamDraw);
 
                 for (var i = 0; i < cmdList.CmdBuffer.Size; i++)
                 {
@@ -116,31 +117,31 @@ namespace ImGuiScene
                         if (clipRect.X < fbWidth && clipRect.Y < fbHeight && clipRect.Z >= 0 && clipRect.W >= 0)
                         {
                             // Apply scissor/clipping rectangle
-                            Gl.Scissor((int)clipRect.X, (int)(fbHeight - clipRect.W), (int)(clipRect.Z - clipRect.X), (int)(clipRect.W - clipRect.Y));
+                            Gl.Scissor((int)clipRect.X, (int)(fbHeight - clipRect.W), (uint)(clipRect.Z - clipRect.X), (uint)(clipRect.W - clipRect.Y));
 
                             // Bind texture, Draw
-                            Gl.BindTexture(TextureTarget.Texture2d, (uint)pcmd.TextureId);
-                            Gl.DrawElementsBaseVertex(PrimitiveType.Triangles, (int)pcmd.ElemCount, DrawElementsType.UnsignedShort, (IntPtr)(pcmd.IdxOffset * sizeof(short)), (int)pcmd.VtxOffset);
+                            Gl.BindTexture(TextureTarget.Texture2D, (uint)pcmd.TextureId);
+                            Gl.DrawElementsBaseVertex(PrimitiveType.Triangles, pcmd.ElemCount, DrawElementsType.UnsignedShort, (IntPtr)(pcmd.IdxOffset * sizeof(short)), (int)pcmd.VtxOffset);
                         }
                     }
                 }
             }
 
             // Destroy the temporary VAO
-            Gl.DeleteVertexArrays(_vertexArrayObject);
+            Gl.DeleteVertexArrays(1, _vertexArrayObject);
 
             // Restore modified GL state
             Gl.UseProgram((uint)lastProgram);
-            Gl.BindTexture(TextureTarget.Texture2d, (uint)lastTexture);
+            Gl.BindTexture(TextureTarget.Texture2D, (uint)lastTexture);
             Gl.ActiveTexture((TextureUnit)lastActiveTexture);
             Gl.BindVertexArray((uint)lastVertexArrayObject);
-            Gl.BindBuffer(BufferTarget.ArrayBuffer, (uint)lastArrayBuffer);
-            Gl.BlendEquationSeparate((BlendEquationMode)lastBlendEquationRgb, (BlendEquationMode)lastBlendEquationAlpha);
+            Gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)lastArrayBuffer);
+            Gl.BlendEquationSeparate((BlendEquationModeEXT)lastBlendEquationRgb, (BlendEquationModeEXT)lastBlendEquationAlpha);
             Gl.BlendFuncSeparate((BlendingFactor)lastBlendSrcRgb, (BlendingFactor)lastBlendDstRgb, (BlendingFactor)lastBlendSrcAlpha, (BlendingFactor)lastBlendDstAlpha);
             if (lastEnableBlend)
             {
                 Gl.Enable(EnableCap.Blend);
-            } 
+            }
             else
             {
                 Gl.Disable(EnableCap.Blend);
@@ -170,8 +171,8 @@ namespace ImGuiScene
                 Gl.Disable(EnableCap.ScissorTest);
             }
             Gl.PolygonMode(MaterialFace.FrontAndBack, (PolygonMode)lastPolygonMode);
-            Gl.Viewport(lastViewport[0], lastViewport[1], lastViewport[2], lastViewport[3]);
-            Gl.Scissor(lastScissorBox[0], lastScissorBox[1], lastScissorBox[2], lastScissorBox[3]);
+            Gl.Viewport(lastViewport[0], lastViewport[1], (uint)lastViewport[2], (uint)lastViewport[3]);
+            Gl.Scissor(lastScissorBox[0], lastScissorBox[1], (uint)lastScissorBox[2], (uint)lastScissorBox[3]);
         }
 
         public void Init(params object[] initParams)
@@ -213,7 +214,7 @@ namespace ImGuiScene
         {
             // Setup render state: alpha-blending enabled, no face culling, no depth testing, scissor enabled, polygon fill
             Gl.Enable(EnableCap.Blend);
-            Gl.BlendEquation(BlendEquationMode.FuncAdd);
+            Gl.BlendEquation(BlendEquationModeEXT.FuncAdd);
             Gl.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             Gl.Disable(EnableCap.CullFace);
             Gl.Disable(EnableCap.DepthTest);
@@ -222,7 +223,7 @@ namespace ImGuiScene
 
             // Setup viewport, orthographic projection matrix
             // Our visible imgui space lies from draw_data->DisplayPos (top left) to draw_data->DisplayPos+data_data->DisplaySize (bottom right). DisplayPos is (0,0) for single viewport apps.
-            Gl.Viewport(0, 0, (int)(drawData.DisplaySize.X * drawData.FramebufferScale.X), (int)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y));
+            Gl.Viewport(0, 0, (uint)(drawData.DisplaySize.X * drawData.FramebufferScale.X), (uint)(drawData.DisplaySize.Y * drawData.FramebufferScale.Y));
             var L = drawData.DisplayPos.X;
             var R = drawData.DisplayPos.X + drawData.DisplaySize.X;
             var T = drawData.DisplayPos.Y;
@@ -241,14 +242,14 @@ namespace ImGuiScene
             Gl.BindVertexArray(_vertexArrayObject);
 
             // Bind vertex/index buffers and setup attributes for ImDrawVert
-            Gl.BindBuffer(BufferTarget.ArrayBuffer, _vboHandle);
-            Gl.BindBuffer(BufferTarget.ElementArrayBuffer, _elementsHandle);
+            Gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vboHandle);
+            Gl.BindBuffer(BufferTargetARB.ElementArrayBuffer, _elementsHandle);
             Gl.EnableVertexAttribArray((uint)_attribLocationVtxPos);
             Gl.EnableVertexAttribArray((uint)_attribLocationVtxUV);
             Gl.EnableVertexAttribArray((uint)_attribLocationVtxColor);
-            Gl.VertexAttribPointer((uint)_attribLocationVtxPos, 2, VertexAttribType.Float, false, Unsafe.SizeOf<ImDrawVert>(), Marshal.OffsetOf(typeof(ImDrawVert), "pos"));
-            Gl.VertexAttribPointer((uint)_attribLocationVtxUV, 2, VertexAttribType.Float, false, Unsafe.SizeOf<ImDrawVert>(), Marshal.OffsetOf(typeof(ImDrawVert), "uv"));
-            Gl.VertexAttribPointer((uint)_attribLocationVtxColor, 4, VertexAttribType.UnsignedByte, true, Unsafe.SizeOf<ImDrawVert>(), Marshal.OffsetOf(typeof(ImDrawVert), "col"));
+            Gl.VertexAttribPointer((uint)_attribLocationVtxPos, 2, VertexAttribPointerType.Float, false, (uint)Unsafe.SizeOf<ImDrawVert>(), Marshal.OffsetOf(typeof(ImDrawVert), "pos"));
+            Gl.VertexAttribPointer((uint)_attribLocationVtxUV, 2, VertexAttribPointerType.Float, false, (uint)Unsafe.SizeOf<ImDrawVert>(), Marshal.OffsetOf(typeof(ImDrawVert), "uv"));
+            Gl.VertexAttribPointer((uint)_attribLocationVtxColor, 4, VertexAttribPointerType.UnsignedByte, true, (uint)Unsafe.SizeOf<ImDrawVert>(), Marshal.OffsetOf(typeof(ImDrawVert), "col"));
         }
 
         private void CreateFontsTexture()
@@ -257,25 +258,25 @@ namespace ImGuiScene
 
             io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int fontWidth, out int fontHeight, out int fontBytesPerPixel);
 
-            Gl.GetInteger(GetPName.TextureBinding2d, out int lastTexture);
+            Gl.GetInteger(GetPName.TextureBinding2D, out int lastTexture);
 
             _fontTexture = Gl.GenTexture();
-            Gl.BindTexture(TextureTarget.Texture2d, _fontTexture);
-            Gl.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMinFilter, TextureMinFilter.Linear);
-            Gl.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMagFilter, TextureMagFilter.Linear);
-            Gl.TexImage2D(TextureTarget.Texture2d, 0, InternalFormat.Rgba, fontWidth, fontHeight, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
+            Gl.BindTexture(TextureTarget.Texture2D, _fontTexture);
+            Gl.TexParameterI(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            Gl.TexParameterI(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            Gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint)fontWidth, (uint)fontHeight, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
 
             io.Fonts.SetTexID((IntPtr)_fontTexture);
             io.Fonts.ClearTexData();
 
-            Gl.BindTexture(TextureTarget.Texture2d, (uint)lastTexture);
+            Gl.BindTexture(TextureTarget.Texture2D, (uint)lastTexture);
         }
 
         private void DestroyFontsTexture()
         {
             if (_fontTexture != 0)
             {
-                Gl.DeleteTextures(_fontTexture);
+                Gl.DeleteTextures(1, _fontTexture);
                 _fontTexture = 0;
 
                 ImGui.GetIO().Fonts.SetTexID(IntPtr.Zero);
@@ -286,7 +287,7 @@ namespace ImGuiScene
         {
             // Backup GL state
             // but why??
-            Gl.GetInteger(GetPName.TextureBinding2d, out int lastTexture);
+            Gl.GetInteger(GetPName.TextureBinding2D, out int lastTexture);
             Gl.GetInteger(GetPName.ArrayBufferBinding, out int lastArrayBuffer);
             Gl.GetInteger(GetPName.VertexArrayBinding, out int lastVertexArray);
 
@@ -301,7 +302,7 @@ namespace ImGuiScene
             }
 
             _vertHandle = Gl.CreateShader(ShaderType.VertexShader);
-            Gl.ShaderSource(_vertHandle, new string[] { shaderSource });
+            Gl.ShaderSource(_vertHandle, shaderSource);
             Gl.CompileShader(_vertHandle);
             CheckShader(_vertHandle, "vertex shader");
 
@@ -312,7 +313,7 @@ namespace ImGuiScene
             }
 
             _fragHandle = Gl.CreateShader(ShaderType.FragmentShader);
-            Gl.ShaderSource(_fragHandle, new string[] { shaderSource });
+            Gl.ShaderSource(_fragHandle, shaderSource);
             Gl.CompileShader(_fragHandle);
             CheckShader(_fragHandle, "fragment shader");
 
@@ -334,8 +335,8 @@ namespace ImGuiScene
             CreateFontsTexture();
 
             // Restore modified GL state
-            Gl.BindTexture(TextureTarget.Texture2d, (uint)lastTexture);
-            Gl.BindBuffer(BufferTarget.ArrayBuffer, (uint)lastArrayBuffer);
+            Gl.BindTexture(TextureTarget.Texture2D, (uint)lastTexture);
+            Gl.BindBuffer(BufferTargetARB.ArrayBuffer, (uint)lastArrayBuffer);
             Gl.BindVertexArray((uint)lastVertexArray);
 
             return true;
@@ -345,13 +346,13 @@ namespace ImGuiScene
         {
             if (_vboHandle != 0)
             {
-                Gl.DeleteBuffers(_vboHandle);
+                Gl.DeleteBuffers(1, _vboHandle);
                 _vboHandle = 0;
             }
 
             if (_elementsHandle != 0)
             {
-                Gl.DeleteBuffers(_elementsHandle);
+                Gl.DeleteBuffers(1, _elementsHandle);
                 _elementsHandle = 0;
             }
 
@@ -386,17 +387,14 @@ namespace ImGuiScene
         private void CheckShader(uint shader, string desc)
         {
             Gl.GetShader(shader, ShaderParameterName.CompileStatus, out int status);
-            if (status == Gl.FALSE)
+            if (status == (int)GLEnum.False)
             {
                 string message = string.Empty;
 
                 Gl.GetShader(shader, ShaderParameterName.InfoLogLength, out int logLength);
                 if (logLength > 1)
                 {
-                    var logBuilder = new StringBuilder();
-                    logBuilder.Capacity = logLength;
-                    Gl.GetShaderInfoLog(shader, logLength, out int length, logBuilder);
-                    message = logBuilder.ToString();
+                    Gl.GetShaderInfoLog(shader, out message);
                 }
 
                 throw new Exception($"{desc} failed to compile: {message}");
@@ -405,18 +403,15 @@ namespace ImGuiScene
 
         private void CheckProgram(uint program, string desc)
         {
-            Gl.GetProgram(program, ProgramProperty.LinkStatus, out int status);
-            if (status == Gl.FALSE)
+            Gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out int status);
+            if (status == (int)GLEnum.False)
             {
                 string message = string.Empty;
 
-                Gl.GetProgram(program, ProgramProperty.InfoLogLength, out int logLength);
+                Gl.GetProgram(program, ProgramPropertyARB.InfoLogLength, out int logLength);
                 if (logLength > 1)
                 {
-                    var logBuilder = new StringBuilder();
-                    logBuilder.Capacity = logLength;
-                    Gl.GetProgramInfoLog(program, logLength, out int length, logBuilder);
-                    message = logBuilder.ToString();
+                    Gl.GetProgramInfoLog(program, out message);
                 }
 
                 throw new Exception($"failed to link {desc}: {message}");

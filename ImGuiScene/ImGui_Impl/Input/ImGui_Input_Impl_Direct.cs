@@ -1,7 +1,6 @@
 using ImGuiNET;
 using System;
 using System.Diagnostics;
-using System.Drawing.Text;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -47,46 +46,46 @@ namespace ImGuiScene
                                ImGuiBackendFlags.PlatformHasViewports;
 
             _platformNamePtr = Marshal.StringToHGlobalAnsi("imgui_impl_win32_c#");
-            io.NativePtr->BackendPlatformName = (byte*) _platformNamePtr.ToPointer();
+            io.NativePtr->BackendPlatformName = (byte*)_platformNamePtr.ToPointer();
 
             ImGuiViewportPtr mainViewport = ImGui.GetMainViewport();
             mainViewport.PlatformHandle = mainViewport.PlatformHandleRaw = hWnd;
             if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable))
                 ImGui_ImplWin32_InitPlatformInterface();
 
-            io.KeyMap[(int) ImGuiKey.Tab] = (int) VirtualKey.Tab;
-            io.KeyMap[(int) ImGuiKey.LeftArrow] = (int) VirtualKey.Left;
-            io.KeyMap[(int) ImGuiKey.RightArrow] = (int) VirtualKey.Right;
-            io.KeyMap[(int) ImGuiKey.UpArrow] = (int) VirtualKey.Up;
-            io.KeyMap[(int) ImGuiKey.DownArrow] = (int) VirtualKey.Down;
-            io.KeyMap[(int) ImGuiKey.PageUp] = (int) VirtualKey.Prior;
-            io.KeyMap[(int) ImGuiKey.PageDown] = (int) VirtualKey.Next;
-            io.KeyMap[(int) ImGuiKey.Home] = (int) VirtualKey.Home;
-            io.KeyMap[(int) ImGuiKey.End] = (int) VirtualKey.End;
-            io.KeyMap[(int) ImGuiKey.Insert] = (int) VirtualKey.Insert;
-            io.KeyMap[(int) ImGuiKey.Delete] = (int) VirtualKey.Delete;
-            io.KeyMap[(int) ImGuiKey.Backspace] = (int) VirtualKey.Back;
-            io.KeyMap[(int) ImGuiKey.Space] = (int) VirtualKey.Space;
-            io.KeyMap[(int) ImGuiKey.Enter] = (int) VirtualKey.Return;
-            io.KeyMap[(int) ImGuiKey.Escape] = (int) VirtualKey.Escape;
+            io.KeyMap[(int)ImGuiKey.Tab] = (int)VirtualKey.Tab;
+            io.KeyMap[(int)ImGuiKey.LeftArrow] = (int)VirtualKey.Left;
+            io.KeyMap[(int)ImGuiKey.RightArrow] = (int)VirtualKey.Right;
+            io.KeyMap[(int)ImGuiKey.UpArrow] = (int)VirtualKey.Up;
+            io.KeyMap[(int)ImGuiKey.DownArrow] = (int)VirtualKey.Down;
+            io.KeyMap[(int)ImGuiKey.PageUp] = (int)VirtualKey.Prior;
+            io.KeyMap[(int)ImGuiKey.PageDown] = (int)VirtualKey.Next;
+            io.KeyMap[(int)ImGuiKey.Home] = (int)VirtualKey.Home;
+            io.KeyMap[(int)ImGuiKey.End] = (int)VirtualKey.End;
+            io.KeyMap[(int)ImGuiKey.Insert] = (int)VirtualKey.Insert;
+            io.KeyMap[(int)ImGuiKey.Delete] = (int)VirtualKey.Delete;
+            io.KeyMap[(int)ImGuiKey.Backspace] = (int)VirtualKey.Back;
+            io.KeyMap[(int)ImGuiKey.Space] = (int)VirtualKey.Space;
+            io.KeyMap[(int)ImGuiKey.Enter] = (int)VirtualKey.Return;
+            io.KeyMap[(int)ImGuiKey.Escape] = (int)VirtualKey.Escape;
             // same keycode, lparam is different.  Not sure if this will cause dupe events or not
-            io.KeyMap[(int) ImGuiKey.KeyPadEnter] = (int) VirtualKey.Return;
-            io.KeyMap[(int) ImGuiKey.A] = (int) VirtualKey.A;
-            io.KeyMap[(int) ImGuiKey.C] = (int) VirtualKey.C;
-            io.KeyMap[(int) ImGuiKey.V] = (int) VirtualKey.V;
-            io.KeyMap[(int) ImGuiKey.X] = (int) VirtualKey.X;
-            io.KeyMap[(int) ImGuiKey.Y] = (int) VirtualKey.Y;
-            io.KeyMap[(int) ImGuiKey.Z] = (int) VirtualKey.Z;
+            io.KeyMap[(int)ImGuiKey.KeyPadEnter] = (int)VirtualKey.Return;
+            io.KeyMap[(int)ImGuiKey.A] = (int)VirtualKey.A;
+            io.KeyMap[(int)ImGuiKey.C] = (int)VirtualKey.C;
+            io.KeyMap[(int)ImGuiKey.V] = (int)VirtualKey.V;
+            io.KeyMap[(int)ImGuiKey.X] = (int)VirtualKey.X;
+            io.KeyMap[(int)ImGuiKey.Y] = (int)VirtualKey.Y;
+            io.KeyMap[(int)ImGuiKey.Z] = (int)VirtualKey.Z;
 
             _cursors = new IntPtr[8];
-            _cursors[(int) ImGuiMouseCursor.Arrow] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_ARROW);
-            _cursors[(int) ImGuiMouseCursor.TextInput] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_IBEAM);
-            _cursors[(int) ImGuiMouseCursor.ResizeAll] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZEALL);
-            _cursors[(int) ImGuiMouseCursor.ResizeEW] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZEWE);
-            _cursors[(int) ImGuiMouseCursor.ResizeNS] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENS);
-            _cursors[(int) ImGuiMouseCursor.ResizeNESW] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENESW);
-            _cursors[(int) ImGuiMouseCursor.ResizeNWSE] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENWSE);
-            _cursors[(int) ImGuiMouseCursor.Hand] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_HAND);
+            _cursors[(int)ImGuiMouseCursor.Arrow] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_ARROW);
+            _cursors[(int)ImGuiMouseCursor.TextInput] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_IBEAM);
+            _cursors[(int)ImGuiMouseCursor.ResizeAll] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZEALL);
+            _cursors[(int)ImGuiMouseCursor.ResizeEW] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZEWE);
+            _cursors[(int)ImGuiMouseCursor.ResizeNS] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENS);
+            _cursors[(int)ImGuiMouseCursor.ResizeNESW] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENESW);
+            _cursors[(int)ImGuiMouseCursor.ResizeNWSE] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENWSE);
+            _cursors[(int)ImGuiMouseCursor.Hand] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_HAND);
         }
 
         public bool IsImGuiCursor(IntPtr hCursor)
@@ -105,7 +104,7 @@ namespace ImGuiScene
 
             var frequency = Stopwatch.Frequency;
             var currentTime = Stopwatch.GetTimestamp();
-            io.DeltaTime = _lastTime > 0 ? (float) ((double) (currentTime - _lastTime) / frequency) : 1f / 60;
+            io.DeltaTime = _lastTime > 0 ? (float)((double)(currentTime - _lastTime) / frequency) : 1f / 60;
             _lastTime = currentTime;
 
             io.KeyCtrl = (Win32.GetKeyState(VirtualKey.Control) & 0x8000) != 0;
@@ -181,7 +180,7 @@ namespace ImGuiScene
                 _iniPathPtr = Marshal.StringToHGlobalAnsi(iniPath);
                 unsafe
                 {
-                    ImGui.GetIO().NativePtr->IniFilename = (byte*) _iniPathPtr.ToPointer();
+                    ImGui.GetIO().NativePtr->IniFilename = (byte*)_iniPathPtr.ToPointer();
                 }
             }
         }
@@ -198,14 +197,15 @@ namespace ImGuiScene
             {
                 if (io.WantSetMousePos)
                 {
-                    Win32.SetCursorPos((int) io.MousePos.X, (int) io.MousePos.Y);
+                    Win32.SetCursorPos((int)io.MousePos.X, (int)io.MousePos.Y);
                 }
 
                 if (Win32.GetCursorPos(out Win32.POINT pt))
                 {
                     io.MousePos.X = pt.X;
                     io.MousePos.Y = pt.Y;
-                } else
+                }
+                else
                 {
                     io.MousePos.X = float.MinValue;
                     io.MousePos.Y = float.MinValue;
@@ -219,7 +219,7 @@ namespace ImGuiScene
                     Win32.ClientToScreen(_hWnd, ref pos);
                     Win32.SetCursorPos(pos.X, pos.Y);
                 }
-                
+
                 if (Win32.GetCursorPos(out Win32.POINT pt) && Win32.ScreenToClient(_hWnd, ref pt))
                 {
                     io.MousePos.X = pt.X;
@@ -304,7 +304,7 @@ namespace ImGuiScene
             if (cur == ImGuiMouseCursor.None || io.MouseDrawCursor)
                 Win32.SetCursor(IntPtr.Zero);
             else
-                Win32.SetCursor(_cursors[(int) cur]);
+                Win32.SetCursor(_cursors[(int)cur]);
 
             return true;
         }
@@ -333,18 +333,21 @@ namespace ImGuiScene
                                 msg == User32.WindowMessage.WM_LBUTTONDBLCLK)
                             {
                                 button = 0;
-                            } else if (msg == User32.WindowMessage.WM_RBUTTONDOWN ||
-                                       msg == User32.WindowMessage.WM_RBUTTONDBLCLK)
+                            }
+                            else if (msg == User32.WindowMessage.WM_RBUTTONDOWN ||
+                                     msg == User32.WindowMessage.WM_RBUTTONDBLCLK)
                             {
                                 button = 1;
-                            } else if (msg == User32.WindowMessage.WM_MBUTTONDOWN ||
-                                       msg == User32.WindowMessage.WM_MBUTTONDBLCLK)
+                            }
+                            else if (msg == User32.WindowMessage.WM_MBUTTONDOWN ||
+                                     msg == User32.WindowMessage.WM_MBUTTONDBLCLK)
                             {
                                 button = 2;
-                            } else if (msg == User32.WindowMessage.WM_XBUTTONDOWN ||
-                                       msg == User32.WindowMessage.WM_XBUTTONDBLCLK)
+                            }
+                            else if (msg == User32.WindowMessage.WM_XBUTTONDOWN ||
+                                     msg == User32.WindowMessage.WM_XBUTTONDBLCLK)
                             {
-                                button = Win32.GET_XBUTTON_WPARAM((ulong) wParam) == Win32Constants.XBUTTON1
+                                button = Win32.GET_XBUTTON_WPARAM((ulong)wParam) == Win32Constants.XBUTTON1
                                              ? 3
                                              : 4;
                             }
@@ -369,15 +372,18 @@ namespace ImGuiScene
                             if (msg == User32.WindowMessage.WM_LBUTTONUP)
                             {
                                 button = 0;
-                            } else if (msg == User32.WindowMessage.WM_RBUTTONUP)
+                            }
+                            else if (msg == User32.WindowMessage.WM_RBUTTONUP)
                             {
                                 button = 1;
-                            } else if (msg == User32.WindowMessage.WM_MBUTTONUP)
+                            }
+                            else if (msg == User32.WindowMessage.WM_MBUTTONUP)
                             {
                                 button = 2;
-                            } else if (msg == User32.WindowMessage.WM_XBUTTONUP)
+                            }
+                            else if (msg == User32.WindowMessage.WM_XBUTTONUP)
                             {
-                                button = Win32.GET_XBUTTON_WPARAM((ulong) wParam) == Win32Constants.XBUTTON1
+                                button = Win32.GET_XBUTTON_WPARAM((ulong)wParam) == Win32Constants.XBUTTON1
                                              ? 3
                                              : 4;
                             }
@@ -395,8 +401,8 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_MOUSEWHEEL:
                         if (io.WantCaptureMouse)
                         {
-                            io.MouseWheel += (float) Win32.GET_WHEEL_DELTA_WPARAM((ulong) wParam) /
-                                             (float) Win32Constants.WHEEL_DELTA;
+                            io.MouseWheel += (float)Win32.GET_WHEEL_DELTA_WPARAM((ulong)wParam) /
+                                             (float)Win32Constants.WHEEL_DELTA;
                             return 0;
                         }
 
@@ -404,8 +410,8 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_MOUSEHWHEEL:
                         if (io.WantCaptureMouse)
                         {
-                            io.MouseWheelH += (float) Win32.GET_WHEEL_DELTA_WPARAM((ulong) wParam) /
-                                              (float) Win32Constants.WHEEL_DELTA;
+                            io.MouseWheelH += (float)Win32.GET_WHEEL_DELTA_WPARAM((ulong)wParam) /
+                                              (float)Win32Constants.WHEEL_DELTA;
                             return 0;
                         }
 
@@ -414,9 +420,9 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_SYSKEYDOWN:
                         if (io.WantTextInput)
                         {
-                            if ((ulong) wParam < 256)
+                            if ((ulong)wParam < 256)
                             {
-                                io.KeysDown[(int) wParam] = true;
+                                io.KeysDown[(int)wParam] = true;
                             }
 
                             return 0;
@@ -427,9 +433,9 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_SYSKEYUP:
                         if (io.WantTextInput)
                         {
-                            if ((ulong) wParam < 256)
+                            if ((ulong)wParam < 256)
                             {
-                                io.KeysDown[(int) wParam] = false;
+                                io.KeysDown[(int)wParam] = false;
                             }
 
                             return 0;
@@ -439,7 +445,7 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_CHAR:
                         if (io.WantTextInput)
                         {
-                            io.AddInputCharacter((uint) wParam);
+                            io.AddInputCharacter((uint)wParam);
                             return 0;
                         }
 
@@ -448,7 +454,7 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_SETCURSOR:
                         if (io.WantCaptureMouse)
                         {
-                            if (Win32.LOWORD((ulong) lParam) == Win32Constants.HTCLIENT && UpdateMouseCursor())
+                            if (Win32.LOWORD((ulong)lParam) == Win32Constants.HTCLIENT && UpdateMouseCursor())
                             {
                                 // this message returns 1 to block further processing
                                 // because consistency is no fun
@@ -486,17 +492,17 @@ namespace ImGuiScene
             // We will return the result here if we consider the message handled
             var processResult = ProcessWndProc(hWnd, msg, wParam, lParam);
 
-            if (processResult != -1) return (IntPtr) processResult;
+            if (processResult != -1) return (IntPtr)processResult;
 
             // This message was intended for the parent/main window
             if (hWnd == _hWnd)
-                return (IntPtr) Win32.CallWindowProc(_oldWndProcPtr, hWnd, (uint) msg, (ulong) wParam, (long) lParam);
+                return (IntPtr)Win32.CallWindowProc(_oldWndProcPtr, hWnd, (uint)msg, (ulong)wParam, (long)lParam);
 
             // The message wasn't handled, but it's a platform window
             // So we have to handle some messages ourselves
             // BUT we might have disposed the context, so check that
             if (ImGui.GetCurrentContext() == IntPtr.Zero)
-                return User32.DefWindowProc(hWnd, msg, (IntPtr) wParam, (IntPtr) lParam);
+                return User32.DefWindowProc(hWnd, msg, (IntPtr)wParam, (IntPtr)lParam);
             ImGuiViewportPtr viewport = ImGui.FindViewportByPlatformHandle(hWnd);
 
             if (viewport.NativePtr != null)
@@ -528,7 +534,7 @@ namespace ImGuiScene
 
                         // We still want to return MA_NOACTIVATE
                         // https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-mouseactivate
-                        return (IntPtr) 0x3;
+                        return (IntPtr)0x3;
                     // break;
                     case User32.WindowMessage.WM_NCHITTEST:
                         // Let mouse pass-through the window. This will allow the backend to set io.MouseHoveredViewport properly (which is OPTIONAL).
@@ -538,14 +544,14 @@ namespace ImGuiScene
                         if (viewport.Flags.HasFlag(ImGuiViewportFlags.NoInputs))
                         {
                             // https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-nchittest
-                            return (IntPtr) uint.MaxValue;
+                            return (IntPtr)uint.MaxValue;
                         }
 
                         break;
                 }
             }
 
-            return User32.DefWindowProc(hWnd, msg, (IntPtr) wParam, (IntPtr) lParam);
+            return User32.DefWindowProc(hWnd, msg, (IntPtr)wParam, (IntPtr)lParam);
         }
 
         #region IDisposable Support
@@ -629,9 +635,9 @@ namespace ImGuiScene
         private SetWindowTitleDelegate setWindowTitle;
         private SetWindowAlphaDelegate setWindowAlpha;
         private UpdateWindowDelegate updateWindow;
-        private SetImeInputPosDelegate setImeInputPos;
-        private GetWindowDpiScaleDelegate getWindowDpiScale;
-        private ChangedViewportDelegate changedViewport;
+        // private SetImeInputPosDelegate setImeInputPos;
+        // private GetWindowDpiScaleDelegate getWindowDpiScale;
+        // private ChangedViewportDelegate changedViewport;
 
         private delegate void CreateWindowDelegate(ImGuiViewportPtr viewport);
 
@@ -665,7 +671,7 @@ namespace ImGuiScene
 
         private delegate void ChangedViewportDelegate(ImGuiViewportPtr viewport);
 
-        private bool wantUpdateMonitors = false;
+        // private bool wantUpdateMonitors = false;
 
         private unsafe void ImGui_ImplWin32_UpdateMonitors()
         {
@@ -684,20 +690,20 @@ namespace ImGuiScene
             // platformIO.NativePtr->Monitors = new ImVector(numMonitors, numMonitors, data);
 
             // Store an iterator for the enumeration function
-            int* iterator = (int*) Marshal.AllocHGlobal(sizeof(int));
+            int* iterator = (int*)Marshal.AllocHGlobal(sizeof(int));
             *iterator = 0;
 
             User32.EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, ImGui_ImplWin32_UpdateMonitors_EnumFunc,
                                        new IntPtr(iterator));
-            this.wantUpdateMonitors = false;
+            // this.wantUpdateMonitors = false;
         }
 
         private unsafe bool ImGui_ImplWin32_UpdateMonitors_EnumFunc(IntPtr nativeMonitor, IntPtr hdc, RECT* LPRECT,
                                                                     void* LPARAM)
         {
             // Get and increment iterator
-            int monitorIndex = *(int*) LPARAM;
-            *(int*) LPARAM = *(int*) LPARAM + 1;
+            int monitorIndex = *(int*)LPARAM;
+            *(int*)LPARAM = *(int*)LPARAM + 1;
 
             User32.MONITORINFO info = new User32.MONITORINFO();
             info.cbSize = Marshal.SizeOf(info);
@@ -718,7 +724,7 @@ namespace ImGuiScene
         }
 
         // Helper structure we store in the void* RenderUserData field of each ImGuiViewport to easily retrieve our backend data.
-        struct ImGuiViewportDataWin32
+        private struct ImGuiViewportDataWin32
         {
             public IntPtr Hwnd;
             public bool HwndOwned;
@@ -763,10 +769,10 @@ namespace ImGuiScene
             // Create window
             RECT rect = new RECT
             {
-                left = (int) viewport.Pos.X,
-                top = (int) viewport.Pos.Y,
-                right = (int) (viewport.Pos.X + viewport.Size.X),
-                bottom = (int) (viewport.Pos.Y + viewport.Size.Y)
+                left = (int)viewport.Pos.X,
+                top = (int)viewport.Pos.Y,
+                right = (int)(viewport.Pos.X + viewport.Size.X),
+                bottom = (int)(viewport.Pos.Y + viewport.Size.Y)
             };
             var rectPtr = MemUtil.ToPointer<RECT>(rect);
             User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
@@ -779,9 +785,9 @@ namespace ImGuiScene
                 parentWindow, IntPtr.Zero, Kernel32.GetModuleHandle(null),
                 IntPtr.Zero); // Parent window, Menu, Instance, Param
 
-            User32.GetWindowThreadProcessId(data.Hwnd, out var windowProcessId);
-            var currentThreadId = Kernel32.GetCurrentThreadId();
-            var currentProcessId = Kernel32.GetCurrentProcessId();
+            // User32.GetWindowThreadProcessId(data.Hwnd, out var windowProcessId);
+            // var currentThreadId = Kernel32.GetCurrentThreadId();
+            // var currentProcessId = Kernel32.GetCurrentProcessId();
 
             // Allow transparent windows
             // TODO: Eventually...
@@ -881,17 +887,17 @@ namespace ImGuiScene
                 data.DwExStyle = newExStyle;
 
                 User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_STYLE,
-                                     (User32.SetWindowLongFlags) data.DwStyle);
+                                     (User32.SetWindowLongFlags)data.DwStyle);
                 User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
-                                     (User32.SetWindowLongFlags) data.DwExStyle);
+                                     (User32.SetWindowLongFlags)data.DwExStyle);
 
                 // Create window
                 RECT rect = new RECT
                 {
-                    left = (int) viewport.Pos.X,
-                    top = (int) viewport.Pos.Y,
-                    right = (int) (viewport.Pos.X + viewport.Size.X),
-                    bottom = (int) (viewport.Pos.Y + viewport.Size.Y)
+                    left = (int)viewport.Pos.X,
+                    top = (int)viewport.Pos.Y,
+                    right = (int)(viewport.Pos.X + viewport.Size.X),
+                    bottom = (int)(viewport.Pos.Y + viewport.Size.Y)
                 };
                 var rectPtr = MemUtil.ToPointer<RECT>(rect);
                 User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
@@ -914,7 +920,7 @@ namespace ImGuiScene
         {
             ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
 
-            POINT pt = new POINT {x = 0, y = 0};
+            POINT pt = new POINT { x = 0, y = 0 };
             User32.ClientToScreen(data.Hwnd, ref pt);
 
             return MemUtil.ToPointer<Vector2>(new Vector2(pt.x, pt.y));
@@ -924,7 +930,7 @@ namespace ImGuiScene
         {
             ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
 
-            RECT rect = new RECT {left = (int) pos.X, top = (int) pos.Y, right = (int) pos.X, bottom = (int) pos.Y};
+            RECT rect = new RECT { left = (int)pos.X, top = (int)pos.Y, right = (int)pos.X, bottom = (int)pos.Y };
             var rectPtr = MemUtil.ToPointer<RECT>(rect);
             User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
             rect = Marshal.PtrToStructure<RECT>(rectPtr);
@@ -950,7 +956,7 @@ namespace ImGuiScene
         {
             ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
 
-            RECT rect = new RECT {left = 0, top = 0, right = (int) size.X, bottom = (int) size.Y};
+            RECT rect = new RECT { left = 0, top = 0, right = (int)size.X, bottom = (int)size.Y };
             var rectPtr = MemUtil.ToPointer<RECT>(rect);
             User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
             rect = Marshal.PtrToStructure<RECT>(rectPtr);
@@ -981,7 +987,7 @@ namespace ImGuiScene
         private byte ImGui_ImplWin32_GetWindowMinimized(ImGuiViewportPtr viewport)
         {
             ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
-            return (byte) (User32.IsIconic(data.Hwnd) ? 1 : 0);
+            return (byte)(User32.IsIconic(data.Hwnd) ? 1 : 0);
         }
 
         private void ImGui_ImplWin32_SetWindowTitle(ImGuiViewportPtr viewport, string title)
@@ -997,18 +1003,19 @@ namespace ImGuiScene
             if (alpha < 1.0f)
             {
                 User32.WindowStylesEx gwl =
-                    (User32.WindowStylesEx) User32.GetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
+                    (User32.WindowStylesEx)User32.GetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
                 User32.WindowStylesEx style = gwl | User32.WindowStylesEx.WS_EX_LAYERED;
                 User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
-                                     (User32.SetWindowLongFlags) style);
-                Win32.SetLayeredWindowAttributes(data.Hwnd, 0, (byte) (255 * alpha), 0x2); //0x2 = LWA_ALPHA
-            } else
+                                     (User32.SetWindowLongFlags)style);
+                Win32.SetLayeredWindowAttributes(data.Hwnd, 0, (byte)(255 * alpha), 0x2); //0x2 = LWA_ALPHA
+            }
+            else
             {
                 User32.WindowStylesEx gwl =
-                    (User32.WindowStylesEx) User32.GetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
+                    (User32.WindowStylesEx)User32.GetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
                 User32.WindowStylesEx style = gwl & ~User32.WindowStylesEx.WS_EX_LAYERED;
                 User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
-                                     (User32.SetWindowLongFlags) style);
+                                     (User32.SetWindowLongFlags)style);
             }
         }
 
@@ -1032,7 +1039,7 @@ namespace ImGuiScene
         // }
 
         // TODO Alpha when it's no longer forced
-        void ImGui_ImplWin32_EnableAlphaCompositing(IntPtr hwnd)
+        private void ImGui_ImplWin32_EnableAlphaCompositing(IntPtr hwnd)
         {
             Win32.DwmIsCompositionEnabled(out bool composition);
 
@@ -1048,7 +1055,7 @@ namespace ImGuiScene
             }
         }
 
-        void ImGui_ImplWin32_InitPlatformInterface()
+        private void ImGui_ImplWin32_InitPlatformInterface()
         {
             _classNamePtr = Marshal.StringToHGlobalUni("ImGui Platform");
 
@@ -1065,7 +1072,7 @@ namespace ImGuiScene
             unsafe
             {
                 wcex.lpszMenuName = null;
-                wcex.lpszClassName = (char*) _classNamePtr;
+                wcex.lpszClassName = (char*)_classNamePtr;
             }
 
             wcex.hIconSm = IntPtr.Zero;
@@ -1115,7 +1122,7 @@ namespace ImGuiScene
             mainViewport.PlatformHandle = _hWnd;
         }
 
-        unsafe void ImGui_ImplWin32_ShutdownPlatformInterface()
+        private unsafe void ImGui_ImplWin32_ShutdownPlatformInterface()
         {
             Marshal.FreeHGlobal(_classNamePtr);
 
