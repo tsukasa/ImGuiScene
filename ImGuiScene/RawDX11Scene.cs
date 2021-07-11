@@ -26,7 +26,7 @@ namespace ImGuiScene
 
         private DeviceContext deviceContext;
         private RenderTargetView rtv;
-        
+
         private int targetWidth;
         private int targetHeight;
 
@@ -289,7 +289,7 @@ namespace ImGuiScene
         #region IDisposable Support
         private bool disposedValue = false; // To detect redundant calls
 
-        void Dispose(bool disposing)
+        private void Dispose(bool disposing)
         {
             if (!disposedValue)
             {
