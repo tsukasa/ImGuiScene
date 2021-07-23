@@ -22,6 +22,7 @@ namespace ImGuiScene
         private User32.WndProc _wndProcDelegate;
         private IntPtr _wndProcPtr;
         private IntPtr _oldWndProcPtr;
+        private bool _imguiMouseIsDown;
 
         // private ImGuiMouseCursor _oldCursor = ImGuiMouseCursor.None;
         private IntPtr[] _cursors;
@@ -358,6 +359,7 @@ namespace ImGuiScene
                             }
 
                             io.MouseDown[button] = true;
+                            this._imguiMouseIsDown = true;
                             return 0;
                         }
 
@@ -366,7 +368,7 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_RBUTTONUP:
                     case User32.WindowMessage.WM_MBUTTONUP:
                     case User32.WindowMessage.WM_XBUTTONUP:
-                        if (io.WantCaptureMouse)
+                        if (io.WantCaptureMouse && this._imguiMouseIsDown)
                         {
                             var button = 0;
                             if (msg == User32.WindowMessage.WM_LBUTTONUP)
@@ -394,6 +396,7 @@ namespace ImGuiScene
                             }
 
                             io.MouseDown[button] = false;
+                            this._imguiMouseIsDown = false;
                             return 0;
                         }
 
