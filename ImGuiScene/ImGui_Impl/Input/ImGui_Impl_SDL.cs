@@ -35,7 +35,7 @@ namespace ImGuiScene
             var io = ImGui.GetIO();
             // We can honor GetMouseCursor() values (optional)
             // We can honor io.WantSetMousePos requests (optional, rarely used)
-            io.BackendFlags = io.BackendFlags | (ImGuiBackendFlags.HasMouseCursors | ImGuiBackendFlags.HasSetMousePos);
+            io.BackendFlags = io.BackendFlags | ImGuiBackendFlags.HasMouseCursors | ImGuiBackendFlags.HasSetMousePos;
 
             // BackendPlatformName is readonly (and null) in ImGui.NET for some reason, but we can hack it via its internal pointer
             _platformNamePtr = Marshal.StringToHGlobalAnsi("imgui_impl_sdl_c#");
@@ -83,8 +83,7 @@ namespace ImGuiScene
             _mouseCursors[(int)ImGuiMouseCursor.ResizeNESW] = SDL_CreateSystemCursor(SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENESW);
             _mouseCursors[(int)ImGuiMouseCursor.ResizeNWSE] = SDL_CreateSystemCursor(SDL_SystemCursor.SDL_SYSTEM_CURSOR_SIZENWSE);
             _mouseCursors[(int)ImGuiMouseCursor.Hand] = SDL_CreateSystemCursor(SDL_SystemCursor.SDL_SYSTEM_CURSOR_HAND);
-            // This apparently does not exist in ImGui.NET
-            // _mouseCursors[(int)ImGuiMouseCursor.NotAllowed] = SDL_CreateSystemCursor(SDL_SystemCursor.SDL_SYSTEM_CURSOR_NO);
+            _mouseCursors[(int)ImGuiMouseCursor.NotAllowed] = SDL_CreateSystemCursor(SDL_SystemCursor.SDL_SYSTEM_CURSOR_NO);
 
             var sysWmInfo = new SDL_SysWMinfo();
             SDL_GetVersion(out sysWmInfo.version);
@@ -194,7 +193,10 @@ namespace ImGuiScene
             else
             {
                 // Show OS mouse cursor
-                SDL_SetCursor(_mouseCursors[(int)imguiCursor] != IntPtr.Zero ? _mouseCursors[(int)imguiCursor] : _mouseCursors[(int)ImGuiMouseCursor.Arrow]);
+                var cursor = _mouseCursors[(int)imguiCursor] != IntPtr.Zero
+                    ? _mouseCursors[(int)imguiCursor]
+                    : _mouseCursors[(int)ImGuiMouseCursor.Arrow];
+                SDL_SetCursor(cursor);
                 SDL_ShowCursor((int)SDL_bool.SDL_TRUE);
             }
         }
@@ -259,11 +261,11 @@ namespace ImGuiScene
                 case SDL_EventType.SDL_KEYDOWN:
                 case SDL_EventType.SDL_KEYUP:
                     var key = sdlEvent.key.keysym.scancode;
-                    io.KeysDown[(int)key] = (sdlEvent.type == SDL_EventType.SDL_KEYDOWN);
-                    io.KeyShift = ((int)SDL_GetModState() & (int)SDL_Keymod.KMOD_SHIFT) != 0;
-                    io.KeyCtrl = ((int)SDL_GetModState() & (int)SDL_Keymod.KMOD_CTRL) != 0;
-                    io.KeyAlt = ((int)SDL_GetModState() & (int)SDL_Keymod.KMOD_ALT) != 0;
-                    io.KeySuper = ((int)SDL_GetModState() & (int)SDL_Keymod.KMOD_GUI) != 0;
+                    io.KeysDown[(int)key] = sdlEvent.type == SDL_EventType.SDL_KEYDOWN;
+                    io.KeyShift = (SDL_GetModState() & SDL_Keymod.KMOD_SHIFT) != 0;
+                    io.KeyCtrl = (SDL_GetModState() & SDL_Keymod.KMOD_CTRL) != 0;
+                    io.KeyAlt = (SDL_GetModState() & SDL_Keymod.KMOD_ALT) != 0;
+                    io.KeySuper = (SDL_GetModState() & SDL_Keymod.KMOD_GUI) != 0;
                     break;
             }
         }
