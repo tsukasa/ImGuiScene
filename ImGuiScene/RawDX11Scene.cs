@@ -173,7 +173,7 @@ namespace ImGuiScene
 
         public TextureWrap LoadImage(byte[] imageBytes)
         {
-            using (var ms = new MemoryStream(imageBytes))
+            using (var ms = new MemoryStream(imageBytes, 0, imageBytes.Length, false, true))
             {
                 var image = Stbi.LoadFromMemory(ms, 4);
                 return LoadImage_Internal(image);
