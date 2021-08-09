@@ -1,4 +1,4 @@
-﻿using ImGuiNET;
+using ImGuiNET;
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -41,7 +41,7 @@ namespace ImGuiScene
             set
             {
                 _framerateLimit = value;
-                Renderer.Vsync = _framerateLimit.Type == FramerateLimit.LimitType.Vsync ? true : false;
+                Renderer.Vsync = _framerateLimit.Type == FramerateLimit.LimitType.Vsync;
 
                 if (_framerateLimit.Type == FramerateLimit.LimitType.FixedFPS)
                 {
@@ -89,7 +89,8 @@ namespace ImGuiScene
                 if (_pauseWhenUnfocused)
                 {
                     OnSDLEvent += FocusHandler;
-                } else
+                }
+                else
                 {
                     OnSDLEvent -= FocusHandler;
                 }
@@ -281,7 +282,7 @@ namespace ImGuiScene
                 _imguiInput.NewFrame(width, height);
 
                 ImGui.NewFrame();
-                    OnBuildUI?.Invoke();
+                OnBuildUI?.Invoke();
                 ImGui.Render();
 
                 Renderer.Clear();

@@ -1,4 +1,5 @@
-﻿using System;
+using Silk.NET.OpenGL;
+using System;
 using System.Runtime.InteropServices;
 using static SDL2.SDL;
 
@@ -9,13 +10,15 @@ namespace ImGuiScene
     /// </summary>
     public class SimpleSDLWindow : IDisposable
     {
+        protected static readonly GL Gl = Util.Gl;
+
         #region imports
         [DllImport("user32.dll")]
-        static extern uint SetWindowLong(IntPtr hWnd, int nIndex, uint dwNewLong);
+        private static extern uint SetWindowLong(IntPtr hWnd, int nIndex, uint dwNewLong);
         [DllImport("user32.dll")]
-        static extern uint GetWindowLong(IntPtr hWnd, int nIndex);
+        private static extern uint GetWindowLong(IntPtr hWnd, int nIndex);
         [DllImport("user32.dll")]
-        static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint crKey, byte bAlpha, uint dwFlags);
+        private static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint crKey, byte bAlpha, uint dwFlags);
         #endregion
 
         /// <summary>

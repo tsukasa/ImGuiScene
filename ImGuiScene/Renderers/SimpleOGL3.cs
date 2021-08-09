@@ -1,4 +1,4 @@
-﻿using OpenGL;
+using Silk.NET.OpenGL;
 using System;
 using System.Numerics;
 using static SDL2.SDL;
@@ -10,6 +10,8 @@ namespace ImGuiScene
     /// </summary>
     public class SimpleOGL3 : IRenderer
     {
+        private static readonly GL Gl = Util.Gl;
+
         public int ContextMajorVersion => 3;
         public int ContextMinorVersion => 2;
 
@@ -22,7 +24,8 @@ namespace ImGuiScene
         /// <summary>
         /// The clear color used by <see cref="Clear"/>
         /// </summary>
-        public Vector4 ClearColor {
+        public Vector4 ClearColor
+        {
             get => _clearColor;
             set
             {
@@ -55,9 +58,8 @@ namespace ImGuiScene
 
         private ImGui_Impl_OpenGL3 _backend = new ImGui_Impl_OpenGL3();
         private IntPtr _glContext;
-        private DeviceContext _deviceContext;
         private SimpleSDLWindow _window;
-        private Gl.DebugProc _debugProc;
+        private DebugProc _debugProc;
 
         // This isn't really a great place to do this
         internal struct WindowBufferConfig
@@ -70,7 +72,7 @@ namespace ImGuiScene
             public int StencilBits;
         }
         // entirely hardcoded for now
-        internal WindowBufferConfig WindowBufferParams => new WindowBufferConfig
+        internal WindowBufferConfig WindowBufferParams => new WindowBufferConfig()
         {
             RedBits = 8,
             GreenBits = 8,
@@ -97,15 +99,10 @@ namespace ImGuiScene
             SDL_GL_MakeCurrent(sdlWindow.Window, _glContext);
             SDL_GL_SetSwapInterval(Vsync ? 1 : 0);
 
-            // because duplicating logic is always exciting
-            // This doesn't (shouldn't?) create an actual additional gl context, but is necessary for OpenGl.NET Gl.* commands to work
-            _deviceContext = DeviceContext.Create(IntPtr.Zero, sdlWindow.GetHWnd());
-            _deviceContext.MakeCurrent(_glContext);
-
             if (Debuggable)
             {
-                Gl.Enable((EnableCap)37600);    // GL_DEBUG_OUTPUT
-                Gl.Enable((EnableCap)33346);    // GL_DEBUG_OUTPUT_SYNCHRONOUS
+                Gl.Enable(EnableCap.DebugOutput);
+                Gl.Enable(EnableCap.DebugOutputSynchronous);
 
                 _debugProc = GL_DebugCallback;
                 Gl.DebugMessageCallback(_debugProc, IntPtr.Zero);
@@ -146,25 +143,25 @@ namespace ImGuiScene
         /// <remarks>The gl texture created by this method is not managed, and it is up to calling code to invoke Dispose() when done</remarks>
         public unsafe TextureWrap CreateTexture(void* pixelData, int width, int height, int bytesPerPixel)
         {
-            Gl.GetInteger(GetPName.TextureBinding2d, out int lastTexture);
+            Gl.GetInteger(GetPName.TextureBinding2D, out int lastTexture);
 
             var texture = Gl.GenTexture();
-            Gl.BindTexture(TextureTarget.Texture2d, texture);
-            Gl.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMinFilter, TextureMinFilter.Linear);
-            Gl.TexParameteri(TextureTarget.Texture2d, TextureParameterName.TextureMagFilter, TextureMagFilter.Linear);
-            Gl.TexImage2D(TextureTarget.Texture2d, 0, InternalFormat.Rgba, width, height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, new IntPtr(pixelData));
+            Gl.BindTexture(TextureTarget.Texture2D, texture);
+            Gl.TexParameterI(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)TextureMinFilter.Linear);
+            Gl.TexParameterI(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
+            Gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint)width, (uint)height, 0, PixelFormat.Rgba, PixelType.UnsignedByte, new IntPtr(pixelData));
 
-            Gl.BindTexture(TextureTarget.Texture2d, (uint)lastTexture);
+            Gl.BindTexture(TextureTarget.Texture2D, (uint)lastTexture);
 
             return new GLTextureWrap(texture, width, height);
         }
 
-        private void GL_DebugCallback(DebugSource source, DebugType type, uint id, DebugSeverity severity, int length, IntPtr message, IntPtr userParam)
+        private void GL_DebugCallback(GLEnum source, GLEnum type, int id, GLEnum severity, int length, IntPtr message, IntPtr userParam)
         {
-            //string msg = System.Runtime.InteropServices.Marshal.PtrToStringAnsi(message);
-            //Console.WriteLine(msg);
             // Could do something with this but it's more for breakpointing and looking into
-            // should probably have a user-provided callback
+            // Should probably have a user-provided callback
+            // string msg = System.Runtime.InteropServices.Marshal.PtrToStringAnsi(message);
+            // Console.WriteLine(msg);
         }
 
         #region ImGui forwarding
@@ -201,11 +198,6 @@ namespace ImGuiScene
                     // TODO: dispose managed state (managed objects).
                 }
 
-                // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
-                // TODO: set large fields to null.
-                _deviceContext?.Dispose();
-                _deviceContext = null;
-
                 SDL_GL_DeleteContext(_glContext);
                 _glContext = IntPtr.Zero;
 
@@ -234,6 +226,8 @@ namespace ImGuiScene
     /// </summary>
     public class GLTextureWrap : TextureWrap
     {
+        private static readonly GL Gl = Util.Gl;
+
         public IntPtr ImGuiHandle { get; }
         public int Width { get; }
         public int Height { get; }
@@ -263,7 +257,7 @@ namespace ImGuiScene
                 var textureId = (uint)ImGuiHandle;
                 if (textureId != 0)
                 {
-                    Gl.DeleteTextures(textureId);
+                    Gl.DeleteTextures(1, textureId);
                 }
 
                 disposedValue = true;
