@@ -3,14 +3,14 @@ using System.Runtime.InteropServices;
 
 namespace ImGuiScene
 {
-    public static class MemUtil
+    public static unsafe class MemUtil
     {
-        public static IntPtr ToPointer<T>(T data)
-        {
-            IntPtr result = IntPtr.Zero;
-            result = Marshal.AllocHGlobal(Marshal.SizeOf<T>());
-            Marshal.StructureToPtr(data, result, false);
-            return result;
+        public static T* Allocate<T>() where T : unmanaged {
+            return (T*)Marshal.AllocHGlobal(Marshal.SizeOf<T>());
+        }
+
+        public static void Free(this IntPtr obj) {
+            Marshal.FreeHGlobal(obj);
         }
     }
 }

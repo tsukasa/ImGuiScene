@@ -10,7 +10,7 @@ namespace ImGuiScene
 {
     // largely a port of https://github.com/ocornut/imgui/blob/master/examples/imgui_impl_win32.cpp, though some changes
     // and wndproc hooking
-    public class ImGui_Input_Impl_Direct : IImGuiInputHandler
+    public unsafe class ImGui_Input_Impl_Direct : IImGuiInputHandler
     {
         private long _lastTime;
 
@@ -650,11 +650,11 @@ namespace ImGuiScene
 
         private delegate void UpdateWindowDelegate(ImGuiViewportPtr viewport);
 
-        private delegate IntPtr GetWindowPosDelegate(IntPtr unk, ImGuiViewportPtr viewport);
+        private delegate Vector2* GetWindowPosDelegate(IntPtr unk, ImGuiViewportPtr viewport);
 
         private delegate void SetWindowPosDelegate(ImGuiViewportPtr viewport, Vector2 pos);
 
-        private delegate IntPtr GetWindowSizeDelegate(IntPtr unk, ImGuiViewportPtr viewport);
+        private delegate Vector2* GetWindowSizeDelegate(IntPtr unk, ImGuiViewportPtr viewport);
 
         private delegate void SetWindowSizeDelegate(ImGuiViewportPtr viewport, Vector2 size);
 
@@ -676,7 +676,7 @@ namespace ImGuiScene
 
         // private bool wantUpdateMonitors = false;
 
-        private unsafe void ImGui_ImplWin32_UpdateMonitors()
+        private void ImGui_ImplWin32_UpdateMonitors()
         {
             // Set up platformIO monitor structures
             // Here we use a manual ImVector overload, free the existing monitor data,
@@ -701,7 +701,7 @@ namespace ImGuiScene
             // this.wantUpdateMonitors = false;
         }
 
-        private unsafe bool ImGui_ImplWin32_UpdateMonitors_EnumFunc(IntPtr nativeMonitor, IntPtr hdc, RECT* LPRECT,
+        private bool ImGui_ImplWin32_UpdateMonitors_EnumFunc(IntPtr nativeMonitor, IntPtr hdc, RECT* LPRECT,
                                                                     void* LPARAM)
         {
             // Get and increment iterator
@@ -726,7 +726,7 @@ namespace ImGuiScene
             return true;
         }
 
-        // Helper structure we store in the void* RenderUserData field of each ImGuiViewport to easily retrieve our backend data.
+        // Helper structure we store in the void* RenderUserData field of each ImGuiViewport to easily retrieve our backend data->
         private struct ImGuiViewportDataWin32
         {
             public IntPtr Hwnd;
@@ -755,12 +755,17 @@ namespace ImGuiScene
 
         private void ImGui_ImplWin32_CreateWindow(ImGuiViewportPtr viewport)
         {
-            // We can create our data instance here, but we cannot save the pointer yet
-            ImGuiViewportDataWin32 data = new ImGuiViewportDataWin32();
-
-
-            // Select style and parent window
-            ImGui_ImplWin32_GetWin32StyleFromViewportFlags(viewport.Flags, ref data.DwStyle, ref data.DwExStyle);
+            var data = (ImGuiViewportDataWin32*)Marshal.AllocHGlobal(Marshal.SizeOf<ImGuiViewportDataWin32>());
+            viewport.PlatformUserData = (IntPtr)data;
+            viewport.Flags =
+                (
+                    ImGuiViewportFlags.NoTaskBarIcon |
+                    ImGuiViewportFlags.NoFocusOnClick |
+                    ImGuiViewportFlags.NoRendererClear |
+                    ImGuiViewportFlags.NoFocusOnAppearing |
+                    viewport.Flags
+                );
+            ImGui_ImplWin32_GetWin32StyleFromViewportFlags(viewport.Flags, ref data->DwStyle, ref data->DwExStyle);
 
             IntPtr parentWindow = IntPtr.Zero;
             if (viewport.ParentViewportId != 0)
@@ -770,37 +775,80 @@ namespace ImGuiScene
             }
 
             // Create window
-            RECT rect = new RECT
-            {
-                left = (int)viewport.Pos.X,
-                top = (int)viewport.Pos.Y,
-                right = (int)(viewport.Pos.X + viewport.Size.X),
-                bottom = (int)(viewport.Pos.Y + viewport.Size.Y)
-            };
-            var rectPtr = MemUtil.ToPointer<RECT>(rect);
-            User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
-            rect = Marshal.PtrToStructure<RECT>(rectPtr);
-            Marshal.FreeHGlobal(rectPtr);
+            var rect = MemUtil.Allocate<RECT>();
+            rect->left = (int)viewport.Pos.X;
+            rect->top = (int)viewport.Pos.Y;
+            rect->right = (int)(viewport.Pos.X + viewport.Size.X);
+            rect->bottom = (int)(viewport.Pos.Y + viewport.Size.Y);
+            User32.AdjustWindowRectEx(rect, data->DwStyle, false, data->DwExStyle);
 
-            data.Hwnd = User32.CreateWindowEx(
-                data.DwExStyle, "ImGui Platform", "Untitled", data.DwStyle, // Style, class name, window name
-                rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, // Window area
+            data->Hwnd = User32.CreateWindowEx(
+                data->DwExStyle, "ImGui Platform", "Untitled", data->DwStyle,
+                rect->left, rect->top, rect->right - rect->left, rect->bottom - rect->top,
                 parentWindow, IntPtr.Zero, Kernel32.GetModuleHandle(null),
-                IntPtr.Zero); // Parent window, Menu, Instance, Param
+                IntPtr.Zero);
 
-            // User32.GetWindowThreadProcessId(data.Hwnd, out var windowProcessId);
+            // User32.GetWindowThreadProcessId(data->Hwnd, out var windowProcessId);
             // var currentThreadId = Kernel32.GetCurrentThreadId();
             // var currentProcessId = Kernel32.GetCurrentProcessId();
 
             // Allow transparent windows
             // TODO: Eventually...
-            ImGui_ImplWin32_EnableAlphaCompositing(data.Hwnd);
+            ImGui_ImplWin32_EnableAlphaCompositing(data->Hwnd);
 
-            data.HwndOwned = true;
+            data->HwndOwned = true;
             viewport.PlatformRequestResize = false;
-            viewport.PlatformHandle = viewport.PlatformHandleRaw = data.Hwnd;
+            viewport.PlatformHandle = viewport.PlatformHandleRaw = data->Hwnd;
+            Marshal.FreeHGlobal((IntPtr)rect);
+        }
 
-            // For some reason, these viewport flags do not stay if they are set earlier
+        private void ImGui_ImplWin32_DestroyWindow(ImGuiViewportPtr viewport)
+        {
+            // This is also called on the main viewport for some reason, and we never set that viewport's PlatformUserData
+            if (viewport.PlatformUserData == IntPtr.Zero) return;
+
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+
+            if (Win32.GetCapture() == data->Hwnd)
+            {
+                // Transfer capture so if we started dragging from a window that later disappears, we'll still receive the MOUSEUP event.
+                User32.ReleaseCapture();
+                User32.SetCapture(_hWnd);
+            }
+
+            if (data->Hwnd != IntPtr.Zero && data->HwndOwned)
+            {
+                var result = User32.DestroyWindow(data->Hwnd);
+
+                if (result == false && Kernel32.GetLastError() == Win32ErrorCode.ERROR_ACCESS_DENIED)
+                {
+                    // We are disposing, and we're doing it from a different thread because of course we are
+                    // Just send the window the close message
+                    User32.PostMessage(data->Hwnd, User32.WindowMessage.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
+                }
+            }
+
+            data->Hwnd = IntPtr.Zero;
+            Marshal.FreeHGlobal(viewport.PlatformUserData);
+            viewport.PlatformUserData = viewport.PlatformHandle = IntPtr.Zero;
+        }
+
+        private void ImGui_ImplWin32_ShowWindow(ImGuiViewportPtr viewport)
+        {
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+
+            if (viewport.Flags.HasFlag(ImGuiViewportFlags.NoFocusOnAppearing))
+                User32.ShowWindow(data->Hwnd, User32.WindowShowStyle.SW_SHOWNA);
+            else
+                User32.ShowWindow(data->Hwnd, User32.WindowShowStyle.SW_SHOW);
+        }
+
+        private void ImGui_ImplWin32_UpdateWindow(ImGuiViewportPtr viewport)
+        {
+            // (Optional) Update Win32 style if it changed _after_ creation.
+            // Generally they won't change unless configuration flags are changed, but advanced uses (such as manually rewriting viewport flags) make this useful.
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+
             viewport.Flags =
                 (
                     ImGuiViewportFlags.NoTaskBarIcon |
@@ -809,69 +857,15 @@ namespace ImGuiScene
                     ImGuiViewportFlags.NoFocusOnAppearing |
                     viewport.Flags
                 );
-
-            // Store viewport data
-            var dataPtr = MemUtil.ToPointer<ImGuiViewportDataWin32>(data);
-            viewport.PlatformUserData = dataPtr;
-        }
-
-        private void ImGui_ImplWin32_DestroyWindow(ImGuiViewportPtr viewport)
-        {
-            // This is also called on the main viewport for some reason, and we never set that viewport's PlatformUserData
-            if (viewport.PlatformUserData == IntPtr.Zero) return;
-
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
-
-            if (Win32.GetCapture() == data.Hwnd)
-            {
-                // Transfer capture so if we started dragging from a window that later disappears, we'll still receive the MOUSEUP event.
-                User32.ReleaseCapture();
-                User32.SetCapture(_hWnd);
-            }
-
-            if (data.Hwnd != IntPtr.Zero && data.HwndOwned)
-            {
-                var result = User32.DestroyWindow(data.Hwnd);
-
-                if (result == false && Kernel32.GetLastError() == Win32ErrorCode.ERROR_ACCESS_DENIED)
-                {
-                    // We are disposing, and we're doing it from a different thread because of course we are
-                    // Just send the window the close message
-                    User32.PostMessage(data.Hwnd, User32.WindowMessage.WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
-                }
-            }
-
-            data.Hwnd = IntPtr.Zero;
-
-            Marshal.FreeHGlobal(viewport.PlatformUserData);
-            viewport.PlatformUserData = viewport.PlatformHandle = IntPtr.Zero;
-        }
-
-        private void ImGui_ImplWin32_ShowWindow(ImGuiViewportPtr viewport)
-        {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
-
-            if (viewport.Flags.HasFlag(ImGuiViewportFlags.NoFocusOnAppearing))
-                User32.ShowWindow(data.Hwnd, User32.WindowShowStyle.SW_SHOWNA);
-            else
-                User32.ShowWindow(data.Hwnd, User32.WindowShowStyle.SW_SHOW);
-        }
-
-        private void ImGui_ImplWin32_UpdateWindow(ImGuiViewportPtr viewport)
-        {
-            // (Optional) Update Win32 style if it changed _after_ creation.
-            // Generally they won't change unless configuration flags are changed, but advanced uses (such as manually rewriting viewport flags) make this useful.
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
-
             User32.WindowStyles newStyle = 0;
             User32.WindowStylesEx newExStyle = 0;
             ImGui_ImplWin32_GetWin32StyleFromViewportFlags(viewport.Flags, ref newStyle, ref newExStyle);
 
             // Only reapply the flags that have been changed from our point of view (as other flags are being modified by Windows)
-            if (data.DwStyle != newStyle || data.DwExStyle != newExStyle)
+            if (data->DwStyle != newStyle || data->DwExStyle != newExStyle)
             {
                 // (Optional) Update TopMost state if it changed _after_ creation
-                bool topMostChanged = (data.DwExStyle & User32.WindowStylesEx.WS_EX_TOPMOST) !=
+                bool topMostChanged = (data->DwExStyle & User32.WindowStylesEx.WS_EX_TOPMOST) !=
                                       (newExStyle & User32.WindowStylesEx.WS_EX_TOPMOST);
 
                 IntPtr insertAfter = IntPtr.Zero;
@@ -886,138 +880,143 @@ namespace ImGuiScene
                 User32.SetWindowPosFlags swpFlag = topMostChanged ? 0 : User32.SetWindowPosFlags.SWP_NOZORDER;
 
                 // Apply flags and position (since it is affected by flags)
-                data.DwStyle = newStyle;
-                data.DwExStyle = newExStyle;
+                data->DwStyle = newStyle;
+                data->DwExStyle = newExStyle;
 
-                User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_STYLE,
-                                     (User32.SetWindowLongFlags)data.DwStyle);
-                User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
-                                     (User32.SetWindowLongFlags)data.DwExStyle);
+                User32.SetWindowLong(data->Hwnd, User32.WindowLongIndexFlags.GWL_STYLE,
+                                     (User32.SetWindowLongFlags)data->DwStyle);
+                User32.SetWindowLong(data->Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
+                                     (User32.SetWindowLongFlags)data->DwExStyle);
 
                 // Create window
-                RECT rect = new RECT
-                {
-                    left = (int)viewport.Pos.X,
-                    top = (int)viewport.Pos.Y,
-                    right = (int)(viewport.Pos.X + viewport.Size.X),
-                    bottom = (int)(viewport.Pos.Y + viewport.Size.Y)
-                };
-                var rectPtr = MemUtil.ToPointer<RECT>(rect);
-                User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
-                rect = Marshal.PtrToStructure<RECT>(rectPtr);
-                Marshal.FreeHGlobal(rectPtr);
-
-                User32.SetWindowPos(data.Hwnd, insertAfter,
-                                    rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
+                var rect = MemUtil.Allocate<RECT>();
+                rect->left = (int)viewport.Pos.X;
+                rect->top = (int)viewport.Pos.Y;
+                rect->right = (int)(viewport.Pos.X + viewport.Size.X);
+                rect->bottom = (int)(viewport.Pos.Y + viewport.Size.Y);
+                User32.AdjustWindowRectEx(rect, data->DwStyle, false, data->DwExStyle);
+                User32.SetWindowPos(data->Hwnd, insertAfter,
+                                    rect->left, rect->top, rect->right - rect->left, rect->bottom - rect->top,
                                     swpFlag |
                                     User32.SetWindowPosFlags.SWP_NOACTIVATE |
                                     User32.SetWindowPosFlags.SWP_FRAMECHANGED);
 
                 // This is necessary when we alter the style
-                User32.ShowWindow(data.Hwnd, User32.WindowShowStyle.SW_SHOWNA);
+                User32.ShowWindow(data->Hwnd, User32.WindowShowStyle.SW_SHOWNA);
                 viewport.PlatformRequestMove = viewport.PlatformRequestResize = true;
+                Marshal.FreeHGlobal((IntPtr)rect);
             }
         }
 
-        private IntPtr ImGui_ImplWin32_GetWindowPos(IntPtr unk, ImGuiViewportPtr viewport)
+        private Vector2* ImGui_ImplWin32_GetWindowPos(IntPtr unk, ImGuiViewportPtr viewport)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+            var vec2 = MemUtil.Allocate<Vector2>();
 
             POINT pt = new POINT { x = 0, y = 0 };
-            User32.ClientToScreen(data.Hwnd, ref pt);
+            User32.ClientToScreen(data->Hwnd, ref pt);
+            vec2->X = pt.x;
+            vec2->Y = pt.y;
 
-            return MemUtil.ToPointer<Vector2>(new Vector2(pt.x, pt.y));
+            return vec2;
         }
 
         private void ImGui_ImplWin32_SetWindowPos(ImGuiViewportPtr viewport, Vector2 pos)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
 
-            RECT rect = new RECT { left = (int)pos.X, top = (int)pos.Y, right = (int)pos.X, bottom = (int)pos.Y };
-            var rectPtr = MemUtil.ToPointer<RECT>(rect);
-            User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
-            rect = Marshal.PtrToStructure<RECT>(rectPtr);
-            Marshal.FreeHGlobal(rectPtr);
-
-            User32.SetWindowPos(data.Hwnd, IntPtr.Zero,
-                                rect.left, rect.top, 0, 0,
+            var rect = MemUtil.Allocate<RECT>();
+            rect->left = (int)pos.X;
+            rect->top = (int)pos.Y;
+            rect->right = (int)pos.X;
+            rect->bottom = (int)pos.Y;
+            
+            User32.AdjustWindowRectEx(rect, data->DwStyle, false, data->DwExStyle);
+            User32.SetWindowPos(data->Hwnd, IntPtr.Zero,
+                                rect->left, rect->top, 0, 0,
                                 User32.SetWindowPosFlags.SWP_NOZORDER |
                                 User32.SetWindowPosFlags.SWP_NOSIZE |
                                 User32.SetWindowPosFlags.SWP_NOACTIVATE);
+            Marshal.FreeHGlobal((IntPtr)rect);
         }
 
-        private IntPtr ImGui_ImplWin32_GetWindowSize(IntPtr size, ImGuiViewportPtr viewport)
+        private Vector2* ImGui_ImplWin32_GetWindowSize(IntPtr size, ImGuiViewportPtr viewport)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+            var vec2 = MemUtil.Allocate<Vector2>();
 
-            User32.GetClientRect(data.Hwnd, out RECT rect);
+            User32.GetClientRect(data->Hwnd, out var rect);
+            vec2->X = rect.right - rect.left;
+            vec2->Y = rect.bottom - rect.top;
 
-            return MemUtil.ToPointer<Vector2>(new Vector2(rect.right - rect.left, rect.bottom - rect.top));
+            return vec2;
         }
 
         private void ImGui_ImplWin32_SetWindowSize(ImGuiViewportPtr viewport, Vector2 size)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
 
-            RECT rect = new RECT { left = 0, top = 0, right = (int)size.X, bottom = (int)size.Y };
-            var rectPtr = MemUtil.ToPointer<RECT>(rect);
-            User32.AdjustWindowRectEx(rectPtr, data.DwStyle, false, data.DwExStyle);
-            rect = Marshal.PtrToStructure<RECT>(rectPtr);
-            Marshal.FreeHGlobal(rectPtr);
-
-            User32.SetWindowPos(data.Hwnd, IntPtr.Zero,
-                                0, 0, rect.right - rect.left, rect.bottom - rect.top,
+            var rect = MemUtil.Allocate<RECT>();
+            rect->left = 0;
+            rect->top = 0;
+            rect->right = (int)size.X;
+            rect->bottom = (int)size.Y;
+            
+            User32.AdjustWindowRectEx(rect, data->DwStyle, false, data->DwExStyle);
+            User32.SetWindowPos(data->Hwnd, IntPtr.Zero,
+                                0, 0, rect->right - rect->left, rect->bottom - rect->top,
                                 User32.SetWindowPosFlags.SWP_NOZORDER |
                                 User32.SetWindowPosFlags.SWP_NOMOVE |
                                 User32.SetWindowPosFlags.SWP_NOACTIVATE);
+            Marshal.FreeHGlobal((IntPtr) rect);
         }
 
         private void ImGui_ImplWin32_SetWindowFocus(ImGuiViewportPtr viewport)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
 
-            Win32.BringWindowToTop(data.Hwnd);
-            User32.SetForegroundWindow(data.Hwnd);
-            Win32.SetFocus(data.Hwnd);
+            Win32.BringWindowToTop(data->Hwnd);
+            User32.SetForegroundWindow(data->Hwnd);
+            Win32.SetFocus(data->Hwnd);
         }
 
         private bool ImGui_ImplWin32_GetWindowFocus(ImGuiViewportPtr viewport)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
-            return User32.GetForegroundWindow() == data.Hwnd;
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+            return User32.GetForegroundWindow() == data->Hwnd;
         }
 
         private byte ImGui_ImplWin32_GetWindowMinimized(ImGuiViewportPtr viewport)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
-            return (byte)(User32.IsIconic(data.Hwnd) ? 1 : 0);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+            return (byte)(User32.IsIconic(data->Hwnd) ? 1 : 0);
         }
 
         private void ImGui_ImplWin32_SetWindowTitle(ImGuiViewportPtr viewport, string title)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
-            User32.SetWindowText(data.Hwnd, title);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
+            User32.SetWindowText(data->Hwnd, title);
         }
 
         private void ImGui_ImplWin32_SetWindowAlpha(ImGuiViewportPtr viewport, float alpha)
         {
-            ImGuiViewportDataWin32 data = Marshal.PtrToStructure<ImGuiViewportDataWin32>(viewport.PlatformUserData);
+            var data = (ImGuiViewportDataWin32*)viewport.PlatformUserData;
 
             if (alpha < 1.0f)
             {
                 User32.WindowStylesEx gwl =
-                    (User32.WindowStylesEx)User32.GetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
+                    (User32.WindowStylesEx)User32.GetWindowLong(data->Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
                 User32.WindowStylesEx style = gwl | User32.WindowStylesEx.WS_EX_LAYERED;
-                User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
+                User32.SetWindowLong(data->Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
                                      (User32.SetWindowLongFlags)style);
-                Win32.SetLayeredWindowAttributes(data.Hwnd, 0, (byte)(255 * alpha), 0x2); //0x2 = LWA_ALPHA
+                Win32.SetLayeredWindowAttributes(data->Hwnd, 0, (byte)(255 * alpha), 0x2); //0x2 = LWA_ALPHA
             }
             else
             {
                 User32.WindowStylesEx gwl =
-                    (User32.WindowStylesEx)User32.GetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
+                    (User32.WindowStylesEx)User32.GetWindowLong(data->Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE);
                 User32.WindowStylesEx style = gwl & ~User32.WindowStylesEx.WS_EX_LAYERED;
-                User32.SetWindowLong(data.Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
+                User32.SetWindowLong(data->Hwnd, User32.WindowLongIndexFlags.GWL_EXSTYLE,
                                      (User32.SetWindowLongFlags)style);
             }
         }
@@ -1118,14 +1117,15 @@ namespace ImGuiScene
             // Register main window handle (which is owned by the main application, not by us)
             // This is mostly for simplicity and consistency, so that our code (e.g. mouse handling etc.) can use same logic for main and secondary viewports.
             ImGuiViewportPtr mainViewport = ImGui.GetMainViewport();
-            ImGuiViewportDataWin32 data = new ImGuiViewportDataWin32();
-            data.Hwnd = _hWnd;
-            data.HwndOwned = false;
-            mainViewport.PlatformUserData = MemUtil.ToPointer(data);
+
+            var data = (ImGuiViewportDataWin32*)Marshal.AllocHGlobal(Marshal.SizeOf<ImGuiViewportDataWin32>());
+            mainViewport.PlatformUserData = (IntPtr)data;
+            data->Hwnd = _hWnd;
+            data->HwndOwned = false;
             mainViewport.PlatformHandle = _hWnd;
         }
 
-        private unsafe void ImGui_ImplWin32_ShutdownPlatformInterface()
+        private void ImGui_ImplWin32_ShutdownPlatformInterface()
         {
             Marshal.FreeHGlobal(_classNamePtr);
 
