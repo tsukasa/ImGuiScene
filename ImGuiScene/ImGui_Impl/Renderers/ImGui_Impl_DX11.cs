@@ -22,7 +22,7 @@ namespace ImGuiScene
     /// https://github.com/GPUOpen-LibrariesAndSDKs/CrossfireAPI11/blob/master/amd_lib/src/AMD_SaveRestoreState.cpp
     /// Would be nice to organize it better, but it seems to work
     /// </summary>
-    public class ImGui_Impl_DX11 : IImGuiRenderer
+    public unsafe class ImGui_Impl_DX11 : IImGuiRenderer
     {
         private IntPtr _renderNamePtr;
         private Device _device;
@@ -743,7 +743,7 @@ namespace ImGuiScene
         // Viewport functions
         public void CreateWindow(ImGuiViewportPtr viewport)
         {
-            ImGuiViewportDataDx11 data = new ImGuiViewportDataDx11();
+            var data = (ImGuiViewportDataDx11*) Marshal.AllocHGlobal(Marshal.SizeOf<ImGuiViewportDataDx11>());
 
             // PlatformHandleRaw should always be a HWND, whereas PlatformHandle might be a higher-level handle (e.g. GLFWWindow*, SDL_Window*).
             // Some backend will leave PlatformHandleRaw NULL, in which case we assume PlatformHandle will contain the HWND.
@@ -759,6 +759,7 @@ namespace ImGuiScene
                     Width = 0,
                     Height = 0,
                     Format = Format.R8G8B8A8_UNorm,
+                    RefreshRate = new Rational(0, 0)
                 },
                 SampleDescription = new SampleDescription
                 {
@@ -773,37 +774,37 @@ namespace ImGuiScene
                 Flags = SwapChainFlags.None
             };
 
+            data->SwapChain = CreateSwapChain(desc);
+
+            // Create the render target view
+            using (var backbuffer = new SwapChain(data->SwapChain).GetBackBuffer<Texture2D>(0))
+                data->View = new RenderTargetView(_device, backbuffer).NativePointer;
+                
+            viewport.RendererUserData = (IntPtr) data;
+        }
+
+        private IntPtr CreateSwapChain(SwapChainDescription desc) {
+
             // Create a swapchain using the existing game hardware (I think)
             using (var dxgi = _device.QueryInterface<SharpDX.DXGI.Device>())
             using (var adapter = dxgi.Adapter)
             using (var factory = adapter.GetParent<Factory>())
             {
-                data.SwapChain = new SwapChain(factory, _device, desc).NativePointer;
+                return new SwapChain(factory, _device, desc).NativePointer;
             }
-
-            // Create the render target view
-            using (var backbuffer = new SwapChain(data.SwapChain).GetBackBuffer<Texture2D>(0))
-                data.View = new RenderTargetView(_device, backbuffer).NativePointer;
-
-            // Save data in renderer data
-            IntPtr dataPtr = IntPtr.Zero;
-            dataPtr = Marshal.AllocHGlobal(Marshal.SizeOf(data));
-            Marshal.StructureToPtr(data, dataPtr, false);
-            viewport.RendererUserData = dataPtr;
         }
 
         public void DestroyWindow(ImGuiViewportPtr viewport)
         {
-
             // This is also called on the main viewport for some reason, and we never set that viewport's RendererUserData
             if (viewport.RendererUserData == IntPtr.Zero) return;
 
-            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
+            var data = (ImGuiViewportDataDx11*) viewport.RendererUserData;
 
-            new SwapChain(data.SwapChain).Dispose();
-            new RenderTargetView(data.View).Dispose();
-            data.SwapChain = IntPtr.Zero;
-            data.View = IntPtr.Zero;
+            new SwapChain(data->SwapChain).Dispose();
+            new RenderTargetView(data->View).Dispose();
+            data->SwapChain = IntPtr.Zero;
+            data->View = IntPtr.Zero;
 
             Marshal.FreeHGlobal(viewport.RendererUserData);
             viewport.RendererUserData = IntPtr.Zero;
@@ -811,26 +812,23 @@ namespace ImGuiScene
 
         public void SetWindowSize(ImGuiViewportPtr viewport, Vector2 size)
         {
-            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
+            var data = (ImGuiViewportDataDx11*)viewport.RendererUserData;
 
             // Delete our existing view
-            new RenderTargetView(data.View).Dispose();
-            var tmpSwap = new SwapChain(data.SwapChain);
+            new RenderTargetView(data->View).Dispose();
+            var tmpSwap = new SwapChain(data->SwapChain);
 
             // Resize buffers and recreate view
             tmpSwap.ResizeBuffers(1, (int)size.X, (int)size.Y, Format.Unknown, SwapChainFlags.None);
             using (var backbuffer = tmpSwap.GetBackBuffer<Texture2D>(0))
-                data.View = new RenderTargetView(_device, backbuffer).NativePointer;
-
-            // We changed rtv's native pointer, so we have to update it
-            viewport.RendererUserData = MemUtil.ToPointer<ImGuiViewportDataDx11>(data);
+                data->View = new RenderTargetView(_device, backbuffer).NativePointer;
         }
 
         public void RenderWindow(ImGuiViewportPtr viewport, IntPtr v)
         {
-            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
+            var data = (ImGuiViewportDataDx11*)viewport.RendererUserData;
 
-            var tmpRtv = new RenderTargetView(data.View);
+            var tmpRtv = new RenderTargetView(data->View);
             this._deviceContext.OutputMerger.SetTargets(tmpRtv);
             if ((viewport.Flags & ImGuiViewportFlags.NoRendererClear) != ImGuiViewportFlags.NoRendererClear)
                 this._deviceContext.ClearRenderTargetView(tmpRtv, new RawColor4(0f, 0f, 0f, 1f));
@@ -839,10 +837,8 @@ namespace ImGuiScene
 
         public void SwapBuffers(ImGuiViewportPtr viewport, IntPtr v)
         {
-            ImGuiViewportDataDx11 data = Marshal.PtrToStructure<ImGuiViewportDataDx11>(viewport.RendererUserData);
-
-            new SwapChain(data.SwapChain).Present(0, PresentFlags.None);
+            var data = (ImGuiViewportDataDx11*)viewport.RendererUserData;
+            new SwapChain(data->SwapChain).Present(0, PresentFlags.None);
         }
-
     }
 }
