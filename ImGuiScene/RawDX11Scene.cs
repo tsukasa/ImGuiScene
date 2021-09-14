@@ -6,7 +6,6 @@ using SharpDX.DXGI;
 using StbiSharp;
 using System;
 using System.IO;
-using ImGuiScene.ManagedAsserts;
 using Device = SharpDX.Direct3D11.Device;
 
 namespace ImGuiScene
@@ -122,12 +121,7 @@ namespace ImGuiScene
 
             ImGui.NewFrame();
 
-            var snap = ImGuiManagedAsserts.GetSnapshot();
-
             OnBuildUI?.Invoke();
-
-            // We need to do this here, since ImGui::Render() already cleans up some errors
-            ImGuiManagedAsserts.ReportProblems(snap);
 
             ImGui.Render();
 
