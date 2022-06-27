@@ -20,8 +20,6 @@ namespace ImGuiScene
         private IntPtr _hWnd;
 
         private User32.WndProc _wndProcDelegate;
-        private IntPtr _wndProcPtr;
-        private IntPtr _oldWndProcPtr;
         private bool _imguiMouseIsDown;
 
         // private ImGuiMouseCursor _oldCursor = ImGuiMouseCursor.None;
@@ -36,8 +34,6 @@ namespace ImGuiScene
             // hook wndproc
             // have to hold onto the delegate to keep it in memory for unmanaged code
             _wndProcDelegate = WndProcDetour;
-            _wndProcPtr = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate);
-            _oldWndProcPtr = Win32.SetWindowLongPtr(_hWnd, WindowLongType.GWL_WNDPROC, _wndProcPtr);
 
             var io = ImGui.GetIO();
 
@@ -310,7 +306,15 @@ namespace ImGuiScene
             return true;
         }
 
-        private unsafe int ProcessWndProc(IntPtr hWnd, User32.WindowMessage msg, void* wParam, void* lParam)
+        /// <summary>
+        /// Processes window messages. Supports both WndProcA and WndProcW.
+        /// </summary>
+        /// <param name="hWnd">Handle of the window.</param>
+        /// <param name="msg">Type of window message.</param>
+        /// <param name="wParam">wParam.</param>
+        /// <param name="lParam">lParam.</param>
+        /// <returns>Return value, if not doing further processing.</returns>
+        public unsafe IntPtr? ProcessWndProcW(IntPtr hWnd, User32.WindowMessage msg, void* wParam, void* lParam)
         {
             if (ImGui.GetCurrentContext() != IntPtr.Zero &&
                 (ImGui.GetIO().WantCaptureMouse || ImGui.GetIO().WantTextInput))
@@ -360,7 +364,7 @@ namespace ImGuiScene
 
                             io.MouseDown[button] = true;
                             this._imguiMouseIsDown = true;
-                            return 0;
+                            return IntPtr.Zero;
                         }
 
                         break;
@@ -397,7 +401,7 @@ namespace ImGuiScene
 
                             io.MouseDown[button] = false;
                             this._imguiMouseIsDown = false;
-                            return 0;
+                            return IntPtr.Zero;
                         }
 
                         break;
@@ -406,7 +410,7 @@ namespace ImGuiScene
                         {
                             io.MouseWheel += (float)Win32.GET_WHEEL_DELTA_WPARAM((ulong)wParam) /
                                              (float)Win32Constants.WHEEL_DELTA;
-                            return 0;
+                            return IntPtr.Zero;
                         }
 
                         break;
@@ -415,7 +419,7 @@ namespace ImGuiScene
                         {
                             io.MouseWheelH += (float)Win32.GET_WHEEL_DELTA_WPARAM((ulong)wParam) /
                                               (float)Win32Constants.WHEEL_DELTA;
-                            return 0;
+                            return IntPtr.Zero;
                         }
 
                         break;
@@ -428,7 +432,7 @@ namespace ImGuiScene
                                 io.KeysDown[(int)wParam] = true;
                             }
 
-                            return 0;
+                            return IntPtr.Zero;
                         }
 
                         break;
@@ -441,7 +445,7 @@ namespace ImGuiScene
                                 io.KeysDown[(int)wParam] = false;
                             }
 
-                            return 0;
+                            return IntPtr.Zero;
                         }
 
                         break;
@@ -449,7 +453,7 @@ namespace ImGuiScene
                         if (io.WantTextInput)
                         {
                             io.AddInputCharacter((uint)wParam);
-                            return 0;
+                            return IntPtr.Zero;
                         }
 
                         break;
@@ -461,7 +465,7 @@ namespace ImGuiScene
                             {
                                 // this message returns 1 to block further processing
                                 // because consistency is no fun
-                                return 1;
+                                return (IntPtr)1;
                             }
                         }
 
@@ -475,7 +479,7 @@ namespace ImGuiScene
             }
 
             // We did not produce a result - return -1
-            return -1;
+            return null;
         }
 
         // TODO: Decode why IME is miserable
@@ -489,17 +493,16 @@ namespace ImGuiScene
         //     return result;
         // }
 
+        /// <summary>
+        /// This WndProc is called for ImGuiScene windows. WndProc for main window will be called back from somewhere else.
+        /// </summary>
         private unsafe IntPtr WndProcDetour(IntPtr hWnd, User32.WindowMessage msg, void* wParam, void* lParam)
         {
             // Attempt to process the result of this window message
             // We will return the result here if we consider the message handled
-            var processResult = ProcessWndProc(hWnd, msg, wParam, lParam);
+            var processResult = ProcessWndProcW(hWnd, msg, wParam, lParam);
 
-            if (processResult != -1) return (IntPtr)processResult;
-
-            // This message was intended for the parent/main window
-            if (hWnd == _hWnd)
-                return (IntPtr)Win32.CallWindowProc(_oldWndProcPtr, hWnd, (uint)msg, (ulong)wParam, (long)lParam);
+            if (processResult != null) return processResult.Value;
 
             // The message wasn't handled, but it's a platform window
             // So we have to handle some messages ourselves
@@ -573,12 +576,6 @@ namespace ImGuiScene
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
                 // TODO: set large fields to null.
-
-                if (_oldWndProcPtr != IntPtr.Zero)
-                {
-                    Win32.SetWindowLongPtr(_hWnd, WindowLongType.GWL_WNDPROC, _oldWndProcPtr);
-                    _oldWndProcPtr = IntPtr.Zero;
-                }
 
                 if (_platformNamePtr != IntPtr.Zero)
                 {

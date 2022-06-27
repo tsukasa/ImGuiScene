@@ -1,4 +1,5 @@
 using ImGuiNET;
+using PInvoke;
 using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
@@ -108,6 +109,18 @@ namespace ImGuiScene
 
             this.imguiRenderer.Init(this.Device, this.deviceContext);
             this.imguiInput = new ImGui_Input_Impl_Direct(WindowHandlePtr);
+        }
+
+        /// <summary>
+        /// Processes window messages.
+        /// </summary>
+        /// <param name="hWnd">Handle of the window.</param>
+        /// <param name="msg">Type of window message.</param>
+        /// <param name="wParam">wParam.</param>
+        /// <param name="lParam">lParam.</param>
+        /// <returns>Return value.</returns>
+        public unsafe IntPtr? ProcessWndProcW(IntPtr hWnd, User32.WindowMessage msg, void* wParam, void* lParam) {
+            return this.imguiInput.ProcessWndProcW(hWnd, msg, wParam, lParam);
         }
 
         public void Render()
