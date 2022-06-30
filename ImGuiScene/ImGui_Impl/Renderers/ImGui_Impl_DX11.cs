@@ -456,7 +456,7 @@ namespace ImGuiScene
             var io = ImGui.GetIO();
 
             // Build texture atlas
-            io.Fonts.GetTexDataAsRGBA32(out IntPtr fontPixels, out int fontWidth, out int fontHeight, out int fontBytesPerPixel);
+            io.Fonts.GetTexDataAsRGBA32(0, out IntPtr fontPixels, out int fontWidth, out int fontHeight, out int fontBytesPerPixel);
 
             // Upload texture to graphics system
             var texDesc = new Texture2DDescription
@@ -485,7 +485,7 @@ namespace ImGuiScene
             }
 
             // Store our identifier
-            io.Fonts.SetTexID(_fontResourceView.NativePointer);
+            io.Fonts.SetTexID(0, _fontResourceView.NativePointer);
             io.Fonts.ClearTexData();
 
             // Create texture sampler
@@ -626,7 +626,7 @@ namespace ImGuiScene
 
             _fontResourceView?.Dispose();
             _fontResourceView = null;
-            ImGui.GetIO().Fonts.SetTexID(IntPtr.Zero);
+            ImGui.GetIO().Fonts.SetTexID(0, IntPtr.Zero);
 
             _indexBuffer?.Dispose();
             _indexBuffer = null;

@@ -66,7 +66,7 @@ namespace ImGuiScene
             io.KeyMap[(int)ImGuiKey.Enter] = (int)VirtualKey.Return;
             io.KeyMap[(int)ImGuiKey.Escape] = (int)VirtualKey.Escape;
             // same keycode, lparam is different.  Not sure if this will cause dupe events or not
-            io.KeyMap[(int)ImGuiKey.KeyPadEnter] = (int)VirtualKey.Return;
+            io.KeyMap[(int)ImGuiKey.KeypadEnter] = (int)VirtualKey.Return;
             io.KeyMap[(int)ImGuiKey.A] = (int)VirtualKey.A;
             io.KeyMap[(int)ImGuiKey.C] = (int)VirtualKey.C;
             io.KeyMap[(int)ImGuiKey.V] = (int)VirtualKey.V;
