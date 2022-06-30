@@ -5,6 +5,8 @@ using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using SharpDX.Mathematics.Interop;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -27,7 +29,7 @@ namespace ImGuiScene
         private IntPtr _renderNamePtr;
         private Device _device;
         private DeviceContext _deviceContext;
-        private ShaderResourceView _fontResourceView;
+        private List<ShaderResourceView> _fontResourceViews = new();
         private SamplerState _fontSampler;
         private VertexShader _vertexShader;
         private PixelShader _pixelShader;
@@ -454,38 +456,46 @@ namespace ImGuiScene
         public void CreateFontsTexture()
         {
             var io = ImGui.GetIO();
+            if (io.Fonts.Textures.Size == 0)
+                io.Fonts.Build();
+            
+            for (int textureIndex = 0, textureCount = io.Fonts.Textures.Size;
+                 textureIndex < textureCount;
+                 textureIndex++) {
 
-            // Build texture atlas
-            io.Fonts.GetTexDataAsRGBA32(0, out IntPtr fontPixels, out int fontWidth, out int fontHeight, out int fontBytesPerPixel);
+                // Build texture atlas
+                io.Fonts.GetTexDataAsRGBA32(textureIndex, out IntPtr fontPixels, out int fontWidth, out int fontHeight,
+                                            out int fontBytesPerPixel);
 
-            // Upload texture to graphics system
-            var texDesc = new Texture2DDescription
-            {
-                Width = fontWidth,
-                Height = fontHeight,
-                MipLevels = 1,
-                ArraySize = 1,
-                Format = Format.R8G8B8A8_UNorm,
-                SampleDescription = new SampleDescription(1, 0),
-                Usage = ResourceUsage.Immutable,
-                BindFlags = BindFlags.ShaderResource,
-                CpuAccessFlags = CpuAccessFlags.None,
-                OptionFlags = ResourceOptionFlags.None
-            };
+                // Upload texture to graphics system
+                var texDesc = new Texture2DDescription {
+                    Width = fontWidth,
+                    Height = fontHeight,
+                    MipLevels = 1,
+                    ArraySize = 1,
+                    Format = Format.R8G8B8A8_UNorm,
+                    SampleDescription = new SampleDescription(1, 0),
+                    Usage = ResourceUsage.Immutable,
+                    BindFlags = BindFlags.ShaderResource,
+                    CpuAccessFlags = CpuAccessFlags.None,
+                    OptionFlags = ResourceOptionFlags.None
+                };
 
-            using (var fontTexture = new Texture2D(_device, texDesc, new DataRectangle(fontPixels, fontWidth * fontBytesPerPixel)))
-            {
+                var fontTexture = new Texture2D(
+                    _device, texDesc, new DataRectangle(fontPixels, fontWidth * fontBytesPerPixel));
+
                 // Create texture view
-                _fontResourceView = new ShaderResourceView(_device, fontTexture, new ShaderResourceViewDescription
-                {
+                var fontResourceView = new ShaderResourceView(_device, fontTexture, new ShaderResourceViewDescription {
                     Format = texDesc.Format,
                     Dimension = ShaderResourceViewDimension.Texture2D,
                     Texture2D = { MipLevels = texDesc.MipLevels }
                 });
+
+                // Store our identifier
+                _fontResourceViews.Add(fontResourceView);
+                io.Fonts.SetTexID(textureIndex, fontResourceView.NativePointer);
             }
 
-            // Store our identifier
-            io.Fonts.SetTexID(0, _fontResourceView.NativePointer);
             io.Fonts.ClearTexData();
 
             // Create texture sampler
@@ -609,7 +619,9 @@ namespace ImGuiScene
         public void RebuildFontTexture()
         {
             _fontSampler?.Dispose();
-            _fontResourceView?.Dispose();
+            foreach (var fontResourceView in this._fontResourceViews)
+                fontResourceView.Dispose();
+            this._fontResourceViews.Clear();
 
             CreateFontsTexture();
         }
@@ -624,9 +636,13 @@ namespace ImGuiScene
             _fontSampler?.Dispose();
             _fontSampler = null;
 
-            _fontResourceView?.Dispose();
-            _fontResourceView = null;
-            ImGui.GetIO().Fonts.SetTexID(0, IntPtr.Zero);
+            foreach (var fontResourceView in this._fontResourceViews)
+                fontResourceView.Dispose();
+            this._fontResourceViews.Clear();
+            for (int textureIndex = 0, textureCount = ImGui.GetIO().Fonts.Textures.Size;
+                 textureIndex < textureCount;
+                 textureIndex++)
+                ImGui.GetIO().Fonts.SetTexID(textureIndex, IntPtr.Zero);
 
             _indexBuffer?.Dispose();
             _indexBuffer = null;
