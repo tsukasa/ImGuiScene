@@ -481,7 +481,7 @@ namespace ImGuiScene
                     OptionFlags = ResourceOptionFlags.None
                 };
 
-                var fontTexture = new Texture2D(
+                using var fontTexture = new Texture2D(
                     _device, texDesc, new DataRectangle(fontPixels, fontWidth * fontBytesPerPixel));
 
                 // Create texture view
