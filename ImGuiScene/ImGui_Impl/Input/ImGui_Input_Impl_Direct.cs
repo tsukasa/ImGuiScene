@@ -384,7 +384,7 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_KEYUP:
                     case User32.WindowMessage.WM_SYSKEYUP:
                         bool isKeyDown = (msg == User32.WindowMessage.WM_KEYDOWN || msg == User32.WindowMessage.WM_SYSKEYDOWN);
-                        if ((int)wParam < 256)
+                        if ((int)wParam < 256 && ImGui.GetIO().WantTextInput)
                         {
                             // Submit modifiers
                             UpdateKeyModifiers();
@@ -418,6 +418,14 @@ namespace ImGuiScene
                                 if (IsVkDown(VirtualKey.LeftMenu) == isKeyDown) { AddKeyEvent(ImGuiKey.LeftAlt, isKeyDown, VirtualKey.LeftMenu, scancode); }
                                 if (IsVkDown(VirtualKey.RightMenu) == isKeyDown) { AddKeyEvent(ImGuiKey.RightAlt, isKeyDown, VirtualKey.RightMenu, scancode); }
                             }
+                            return IntPtr.Zero;
+                        }
+                        break;
+                    case User32.WindowMessage.WM_CHAR:
+                        if (io.WantTextInput)
+                        {
+                            io.AddInputCharacter((uint)wParam);
+                            return IntPtr.Zero;
                         }
                         break;
                     // this never seemed to work reasonably, but I'll leave it for now
@@ -431,7 +439,6 @@ namespace ImGuiScene
                                 return (IntPtr)1;
                             }
                         }
-
                         break;
                     // TODO: Decode why IME is miserable
                     // case User32.WindowMessage.WM_IME_NOTIFY:
@@ -470,7 +477,7 @@ namespace ImGuiScene
             // This is something of a brute force fix that basically makes key up events irrelevant
             // Holding a key will send repeated key down events and (re)set these where appropriate, so this should be ok.
             var io = ImGui.GetIO();
-            if (!io.WantTextInput)
+            if (!io.WantCaptureMouse)
             {
                 for (int i = (int)ImGuiKey.NamedKey_BEGIN; i < (int)ImGuiKey.NamedKey_END; i++) {
                     io.AddKeyEvent((ImGuiKey) i, false);
