@@ -472,8 +472,8 @@ namespace ImGuiScene
             var io = ImGui.GetIO();
             if (!io.WantTextInput)
             {
-                foreach (var key in Enum.GetValues(typeof(ImGuiKey)).OfType<ImGuiKey>()) {
-                    io.AddKeyEvent(key, false);
+                for (int i = (int)ImGuiKey.NamedKey_BEGIN; i < (int)ImGuiKey.NamedKey_END; i++) {
+                    io.AddKeyEvent((ImGuiKey) i, false);
                 }
             }
         }
