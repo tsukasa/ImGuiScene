@@ -272,8 +272,7 @@ namespace ImGuiScene
         /// <returns>Return value, if not doing further processing.</returns>
         public unsafe IntPtr? ProcessWndProcW(IntPtr hWnd, User32.WindowMessage msg, void* wParam, void* lParam)
         {
-            if (ImGui.GetCurrentContext() != IntPtr.Zero &&
-                (ImGui.GetIO().WantCaptureMouse || ImGui.GetIO().WantTextInput))
+            if (ImGui.GetCurrentContext() != IntPtr.Zero)
             {
                 var io = ImGui.GetIO();
 
@@ -384,7 +383,7 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_KEYUP:
                     case User32.WindowMessage.WM_SYSKEYUP:
                         bool isKeyDown = (msg == User32.WindowMessage.WM_KEYDOWN || msg == User32.WindowMessage.WM_SYSKEYDOWN);
-                        if ((int)wParam < 256 && ImGui.GetIO().WantTextInput)
+                        if ((int)wParam < 256)
                         {
                             // Submit modifiers
                             UpdateKeyModifiers();
@@ -398,9 +397,11 @@ namespace ImGuiScene
                             // Submit key event
                             var key = VirtualKeyToImGuiKey(vk);
                             var scancode = ((int)lParam & 0xff0000) >> 16;
-                            if (key != ImGuiKey.None)
+                            if (key != ImGuiKey.None && io.WantTextInput) {
                                 AddKeyEvent(key, isKeyDown, vk, scancode);
-
+                                return IntPtr.Zero;
+                            }
+                            
                             // Submit individual left/right modifier events
                             if (vk == VirtualKey.Shift)
                             {
@@ -418,7 +419,6 @@ namespace ImGuiScene
                                 if (IsVkDown(VirtualKey.LeftMenu) == isKeyDown) { AddKeyEvent(ImGuiKey.LeftAlt, isKeyDown, VirtualKey.LeftMenu, scancode); }
                                 if (IsVkDown(VirtualKey.RightMenu) == isKeyDown) { AddKeyEvent(ImGuiKey.RightAlt, isKeyDown, VirtualKey.RightMenu, scancode); }
                             }
-                            return IntPtr.Zero;
                         }
                         break;
                     case User32.WindowMessage.WM_CHAR:
@@ -477,9 +477,21 @@ namespace ImGuiScene
             // This is something of a brute force fix that basically makes key up events irrelevant
             // Holding a key will send repeated key down events and (re)set these where appropriate, so this should be ok.
             var io = ImGui.GetIO();
-            if (!io.WantCaptureMouse)
+            if (!io.WantTextInput)
             {
                 for (int i = (int)ImGuiKey.NamedKey_BEGIN; i < (int)ImGuiKey.NamedKey_END; i++) {
+                    if (
+                        (ImGuiKey)i == ImGuiKey.LeftShift ||
+                        (ImGuiKey)i == ImGuiKey.RightShift ||
+                        (ImGuiKey)i == ImGuiKey.ModShift ||
+                        (ImGuiKey)i == ImGuiKey.LeftCtrl ||
+                        (ImGuiKey)i == ImGuiKey.RightCtrl ||
+                        (ImGuiKey)i == ImGuiKey.ModCtrl ||
+                        (ImGuiKey)i == ImGuiKey.LeftAlt ||
+                        (ImGuiKey)i == ImGuiKey.RightAlt ||
+                        (ImGuiKey)i == ImGuiKey.ModAlt
+                    )
+                        continue;
                     io.AddKeyEvent((ImGuiKey) i, false);
                 }
             }
