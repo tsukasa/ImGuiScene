@@ -395,7 +395,7 @@ namespace ImGuiScene
                                 vk = (VirtualKey.Return + 256);
 
                             // Submit key event
-                            var key = VirtualKeyToImGuiKey(vk);
+                            var key = VirtualKeyToImGuiKey((int)vk);
                             var scancode = ((int)lParam & 0xff0000) >> 16;
                             if (key != ImGuiKey.None && io.WantTextInput) {
                                 AddKeyEvent(key, isKeyDown, vk, scancode);
@@ -452,7 +452,7 @@ namespace ImGuiScene
             return null;
         }
         
-        private static void ProcessKeyEventsWorkarounds()
+        private void ProcessKeyEventsWorkarounds()
         {
             // Left & right Shift keys: when both are pressed together, Windows tend to not generate the WM_KEYUP event for the first released one.
             if (ImGui.IsKeyDown(ImGuiKey.LeftShift) && !IsVkDown(VirtualKey.LeftShift))
@@ -480,16 +480,19 @@ namespace ImGuiScene
             if (!io.WantTextInput)
             {
                 for (int i = (int)ImGuiKey.NamedKey_BEGIN; i < (int)ImGuiKey.NamedKey_END; i++) {
-                    if (
-                        (ImGuiKey)i == ImGuiKey.LeftShift ||
-                        (ImGuiKey)i == ImGuiKey.RightShift ||
-                        (ImGuiKey)i == ImGuiKey.ModShift ||
-                        (ImGuiKey)i == ImGuiKey.LeftCtrl ||
-                        (ImGuiKey)i == ImGuiKey.RightCtrl ||
-                        (ImGuiKey)i == ImGuiKey.ModCtrl ||
-                        (ImGuiKey)i == ImGuiKey.LeftAlt ||
-                        (ImGuiKey)i == ImGuiKey.RightAlt ||
-                        (ImGuiKey)i == ImGuiKey.ModAlt
+                    // Skip raising modifier keys if the game is focused.
+                    // This allows us to raise the keys when one is held and the window becomes unfocused,
+                    // but if we do not skip them, they will only be held down every 4th frame or so.
+                    if (User32.GetForegroundWindow() == this._hWnd &&
+                        ((ImGuiKey)i == ImGuiKey.LeftShift ||
+                         (ImGuiKey)i == ImGuiKey.RightShift ||
+                         (ImGuiKey)i == ImGuiKey.ModShift ||
+                         (ImGuiKey)i == ImGuiKey.LeftCtrl ||
+                         (ImGuiKey)i == ImGuiKey.RightCtrl ||
+                         (ImGuiKey)i == ImGuiKey.ModCtrl ||
+                         (ImGuiKey)i == ImGuiKey.LeftAlt ||
+                         (ImGuiKey)i == ImGuiKey.RightAlt ||
+                         (ImGuiKey)i == ImGuiKey.ModAlt)
                     )
                         continue;
                     io.AddKeyEvent((ImGuiKey) i, false);
@@ -575,7 +578,6 @@ namespace ImGuiScene
                         // We still want to return MA_NOACTIVATE
                         // https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-mouseactivate
                         return (IntPtr)0x3;
-                    // break;
                     case User32.WindowMessage.WM_NCHITTEST:
                         // Let mouse pass-through the window. This will allow the backend to set io.MouseHoveredViewport properly (which is OPTIONAL).
                         // The ImGuiViewportFlags_NoInputs flag is set while dragging a viewport, as want to detect the window behind the one we are dragging.
@@ -586,7 +588,6 @@ namespace ImGuiScene
                             // https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-nchittest
                             return (IntPtr)uint.MaxValue;
                         }
-
                         break;
                 }
             }
@@ -594,9 +595,22 @@ namespace ImGuiScene
             return User32.DefWindowProc(hWnd, msg, (IntPtr)wParam, (IntPtr)lParam);
         }
         
+        private static void UpAllKeys() {
+            var io = ImGui.GetIO();
+            for (int i = (int)ImGuiKey.NamedKey_BEGIN; i < (int)ImGuiKey.NamedKey_END; i++)
+                io.AddKeyEvent((ImGuiKey) i, false);
+        }
+        
+        private static void UpAllMouseButton() {
+            var io = ImGui.GetIO();
+            for (int i = 0; i < io.MouseDown.Count; i++)
+                io.MouseDown[i] = false;
+        }
+
+        #region large switch statements
         // Map VK_xxx to ImGuiKey.xxx.
-        static ImGuiKey VirtualKeyToImGuiKey(VirtualKey key) {
-            return key switch {
+        public static ImGuiKey VirtualKeyToImGuiKey(int key) {
+            return (VirtualKey)key switch {
                 VirtualKey.Tab => ImGuiKey.Tab,
                 VirtualKey.Left => ImGuiKey.LeftArrow,
                 VirtualKey.Right => ImGuiKey.RightArrow,
@@ -704,6 +718,120 @@ namespace ImGuiScene
                 _ => ImGuiKey.None
             };
         }
+        
+        // Map ImGuiKey.xxx to VK_xxx.
+        public static int ImGuiKeyToVirtualKey(ImGuiKey key) {
+            VirtualKey vk = key switch {
+                ImGuiKey.Tab => VirtualKey.Tab,
+                ImGuiKey.LeftArrow => VirtualKey.Left,
+                ImGuiKey.RightArrow => VirtualKey.Right,
+                ImGuiKey.UpArrow => VirtualKey.Up,
+                ImGuiKey.DownArrow => VirtualKey.Down,
+                ImGuiKey.PageUp => VirtualKey.Prior,
+                ImGuiKey.PageDown => VirtualKey.Next,
+                ImGuiKey.Home => VirtualKey.Home,
+                ImGuiKey.End => VirtualKey.End,
+                ImGuiKey.Insert => VirtualKey.Insert,
+                ImGuiKey.Delete => VirtualKey.Delete,
+                ImGuiKey.Backspace => VirtualKey.Back,
+                ImGuiKey.Space => VirtualKey.Space,
+                ImGuiKey.Enter => VirtualKey.Return,
+                ImGuiKey.Escape => VirtualKey.Escape,
+                ImGuiKey.Apostrophe => VirtualKey.OEM7,
+                ImGuiKey.Comma => VirtualKey.OEMComma,
+                ImGuiKey.Minus => VirtualKey.OEMMinus,
+                ImGuiKey.Period => VirtualKey.OEMPeriod,
+                ImGuiKey.Slash => VirtualKey.OEM2,
+                ImGuiKey.Semicolon => VirtualKey.OEM1,
+                ImGuiKey.Equal => VirtualKey.OEMPlus,
+                ImGuiKey.LeftBracket => VirtualKey.OEM4,
+                ImGuiKey.Backslash => VirtualKey.OEM5,
+                ImGuiKey.RightBracket => VirtualKey.OEM6,
+                ImGuiKey.GraveAccent => VirtualKey.OEM3,
+                ImGuiKey.CapsLock => VirtualKey.CapsLock,
+                ImGuiKey.ScrollLock => VirtualKey.ScrollLock,
+                ImGuiKey.NumLock => VirtualKey.NumLock,
+                ImGuiKey.PrintScreen => VirtualKey.Snapshot,
+                ImGuiKey.Pause => VirtualKey.Pause,
+                ImGuiKey.Keypad0 => VirtualKey.Numpad0,
+                ImGuiKey.Keypad1 => VirtualKey.Numpad1,
+                ImGuiKey.Keypad2 => VirtualKey.Numpad2,
+                ImGuiKey.Keypad3 => VirtualKey.Numpad3,
+                ImGuiKey.Keypad4 => VirtualKey.Numpad4,
+                ImGuiKey.Keypad5 => VirtualKey.Numpad5,
+                ImGuiKey.Keypad6 => VirtualKey.Numpad6,
+                ImGuiKey.Keypad7 => VirtualKey.Numpad7,
+                ImGuiKey.Keypad8 => VirtualKey.Numpad8,
+                ImGuiKey.Keypad9 => VirtualKey.Numpad9,
+                ImGuiKey.KeypadDecimal => VirtualKey.Decimal,
+                ImGuiKey.KeypadDivide => VirtualKey.Divide,
+                ImGuiKey.KeypadMultiply => VirtualKey.Multiply,
+                ImGuiKey.KeypadSubtract => VirtualKey.Subtract,
+                ImGuiKey.KeypadAdd => VirtualKey.Add,
+                ImGuiKey.KeypadEnter => (VirtualKey.Return + 256),
+                ImGuiKey.LeftShift => VirtualKey.LeftShift,
+                ImGuiKey.LeftCtrl => VirtualKey.LeftControl,
+                ImGuiKey.LeftAlt => VirtualKey.LeftMenu,
+                ImGuiKey.LeftSuper => VirtualKey.LeftWindows,
+                ImGuiKey.RightShift => VirtualKey.RightShift,
+                ImGuiKey.RightCtrl => VirtualKey.RightControl,
+                ImGuiKey.RightAlt => VirtualKey.RightMenu,
+                ImGuiKey.RightSuper => VirtualKey.RightWindows,
+                ImGuiKey.Menu => VirtualKey.Application,
+                ImGuiKey._0 => VirtualKey.N0,
+                ImGuiKey._1 => VirtualKey.N1,
+                ImGuiKey._2 => VirtualKey.N2,
+                ImGuiKey._3 => VirtualKey.N3,
+                ImGuiKey._4 => VirtualKey.N4,
+                ImGuiKey._5 => VirtualKey.N5,
+                ImGuiKey._6 => VirtualKey.N6,
+                ImGuiKey._7 => VirtualKey.N7,
+                ImGuiKey._8 => VirtualKey.N8,
+                ImGuiKey._9 => VirtualKey.N9,
+                ImGuiKey.A => VirtualKey.A,
+                ImGuiKey.B => VirtualKey.B,
+                ImGuiKey.C => VirtualKey.C,
+                ImGuiKey.D => VirtualKey.D,
+                ImGuiKey.E => VirtualKey.E,
+                ImGuiKey.F => VirtualKey.F,
+                ImGuiKey.G => VirtualKey.G,
+                ImGuiKey.H => VirtualKey.H,
+                ImGuiKey.I => VirtualKey.I,
+                ImGuiKey.J => VirtualKey.J,
+                ImGuiKey.K => VirtualKey.K,
+                ImGuiKey.L => VirtualKey.L,
+                ImGuiKey.M => VirtualKey.M,
+                ImGuiKey.N => VirtualKey.N,
+                ImGuiKey.O => VirtualKey.O,
+                ImGuiKey.P => VirtualKey.P,
+                ImGuiKey.Q => VirtualKey.Q,
+                ImGuiKey.R => VirtualKey.R,
+                ImGuiKey.S => VirtualKey.S,
+                ImGuiKey.T => VirtualKey.T,
+                ImGuiKey.U => VirtualKey.U,
+                ImGuiKey.V => VirtualKey.V,
+                ImGuiKey.W => VirtualKey.W,
+                ImGuiKey.X => VirtualKey.X,
+                ImGuiKey.Y => VirtualKey.Y,
+                ImGuiKey.Z => VirtualKey.Z,
+                ImGuiKey.F1 => VirtualKey.F1,
+                ImGuiKey.F2 => VirtualKey.F2,
+                ImGuiKey.F3 => VirtualKey.F3,
+                ImGuiKey.F4 => VirtualKey.F4,
+                ImGuiKey.F5 => VirtualKey.F5,
+                ImGuiKey.F6 => VirtualKey.F6,
+                ImGuiKey.F7 => VirtualKey.F7,
+                ImGuiKey.F8 => VirtualKey.F8,
+                ImGuiKey.F9 => VirtualKey.F9,
+                ImGuiKey.F10 => VirtualKey.F10,
+                ImGuiKey.F11 => VirtualKey.F11,
+                ImGuiKey.F12 => VirtualKey.F12,
+                _ => 0
+            };
+
+            return (int)vk;
+        }
+        #endregion
 
         #region IDisposable Support
 
