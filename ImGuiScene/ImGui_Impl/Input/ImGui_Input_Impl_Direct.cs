@@ -484,16 +484,8 @@ namespace ImGuiScene
                     // This allows us to raise the keys when one is held and the window becomes unfocused,
                     // but if we do not skip them, they will only be held down every 4th frame or so.
                     if (User32.GetForegroundWindow() == this._hWnd &&
-                        ((ImGuiKey)i == ImGuiKey.LeftShift ||
-                         (ImGuiKey)i == ImGuiKey.RightShift ||
-                         (ImGuiKey)i == ImGuiKey.ModShift ||
-                         (ImGuiKey)i == ImGuiKey.LeftCtrl ||
-                         (ImGuiKey)i == ImGuiKey.RightCtrl ||
-                         (ImGuiKey)i == ImGuiKey.ModCtrl ||
-                         (ImGuiKey)i == ImGuiKey.LeftAlt ||
-                         (ImGuiKey)i == ImGuiKey.RightAlt ||
-                         (ImGuiKey)i == ImGuiKey.ModAlt)
-                    )
+                        (IsGamepadKey((ImGuiKey) i) ||
+                        IsModKey((ImGuiKey) i)))
                         continue;
                     io.AddKeyEvent((ImGuiKey) i, false);
                 }
@@ -831,6 +823,22 @@ namespace ImGuiScene
 
             return (int)vk;
         }
+        
+        private static bool IsGamepadKey(ImGuiKey key) {
+            return (int) key is >= 617 and <= 640;
+        }
+
+        private static bool IsModKey(ImGuiKey key) {
+            return key is ImGuiKey.LeftShift
+                       or ImGuiKey.RightShift
+                       or ImGuiKey.ModShift
+                       or ImGuiKey.LeftCtrl
+                       or ImGuiKey.ModCtrl
+                       or ImGuiKey.LeftAlt
+                       or ImGuiKey.RightAlt
+                       or ImGuiKey.ModAlt;
+        }
+        
         #endregion
 
         #region IDisposable Support
