@@ -20,7 +20,7 @@ namespace ImGuiScene
         private IntPtr _hWnd;
 
         private User32.WndProc _wndProcDelegate;
-        private bool _imguiMouseIsDown;
+        private bool[] _imguiMouseIsDown;
 
         // private ImGuiMouseCursor _oldCursor = ImGuiMouseCursor.None;
         private IntPtr[] _cursors;
@@ -49,6 +49,8 @@ namespace ImGuiScene
             mainViewport.PlatformHandle = mainViewport.PlatformHandleRaw = hWnd;
             if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable))
                 ImGui_ImplWin32_InitPlatformInterface();
+
+            _imguiMouseIsDown = new bool[5];
             
             _cursors = new IntPtr[9];
             _cursors[(int)ImGuiMouseCursor.Arrow] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_ARROW);
@@ -285,81 +287,35 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_MBUTTONDOWN:
                     case User32.WindowMessage.WM_MBUTTONDBLCLK:
                     case User32.WindowMessage.WM_XBUTTONDOWN:
-                    case User32.WindowMessage.WM_XBUTTONDBLCLK:
+                    case User32.WindowMessage.WM_XBUTTONDBLCLK: {
+                        var button = GetButton(msg, (ulong)wParam);
                         if (io.WantCaptureMouse)
                         {
-                            var button = 0;
-                            if (msg == User32.WindowMessage.WM_LBUTTONDOWN ||
-                                msg == User32.WindowMessage.WM_LBUTTONDBLCLK)
-                            {
-                                button = 0;
-                            }
-                            else if (msg == User32.WindowMessage.WM_RBUTTONDOWN ||
-                                     msg == User32.WindowMessage.WM_RBUTTONDBLCLK)
-                            {
-                                button = 1;
-                            }
-                            else if (msg == User32.WindowMessage.WM_MBUTTONDOWN ||
-                                     msg == User32.WindowMessage.WM_MBUTTONDBLCLK)
-                            {
-                                button = 2;
-                            }
-                            else if (msg == User32.WindowMessage.WM_XBUTTONDOWN ||
-                                     msg == User32.WindowMessage.WM_XBUTTONDBLCLK)
-                            {
-                                button = Win32.GET_XBUTTON_WPARAM((ulong)wParam) == Win32Constants.XBUTTON1
-                                             ? 3
-                                             : 4;
-                            }
-
                             if (!ImGui.IsAnyMouseDown() && Win32.GetCapture() == IntPtr.Zero)
-                            {
                                 Win32.SetCapture(hWnd);
-                            }
 
                             io.MouseDown[button] = true;
-                            this._imguiMouseIsDown = true;
+                            this._imguiMouseIsDown[button] = true;
                             return IntPtr.Zero;
                         }
-
                         break;
+                    }
                     case User32.WindowMessage.WM_LBUTTONUP:
                     case User32.WindowMessage.WM_RBUTTONUP:
                     case User32.WindowMessage.WM_MBUTTONUP:
-                    case User32.WindowMessage.WM_XBUTTONUP:
-                        if (io.WantCaptureMouse && this._imguiMouseIsDown)
+                    case User32.WindowMessage.WM_XBUTTONUP: {
+                        var button = GetButton(msg, (ulong)wParam);
+                        if (io.WantCaptureMouse && this._imguiMouseIsDown[button])
                         {
-                            var button = 0;
-                            if (msg == User32.WindowMessage.WM_LBUTTONUP)
-                            {
-                                button = 0;
-                            }
-                            else if (msg == User32.WindowMessage.WM_RBUTTONUP)
-                            {
-                                button = 1;
-                            }
-                            else if (msg == User32.WindowMessage.WM_MBUTTONUP)
-                            {
-                                button = 2;
-                            }
-                            else if (msg == User32.WindowMessage.WM_XBUTTONUP)
-                            {
-                                button = Win32.GET_XBUTTON_WPARAM((ulong)wParam) == Win32Constants.XBUTTON1
-                                             ? 3
-                                             : 4;
-                            }
-
                             if (!ImGui.IsAnyMouseDown() && Win32.GetCapture() == hWnd)
-                            {
                                 Win32.ReleaseCapture();
-                            }
 
                             io.MouseDown[button] = false;
-                            this._imguiMouseIsDown = false;
+                            this._imguiMouseIsDown[button] = false;
                             return IntPtr.Zero;
                         }
-
                         break;
+                    }
                     case User32.WindowMessage.WM_MOUSEWHEEL:
                         if (io.WantCaptureMouse)
                         {
@@ -450,6 +406,30 @@ namespace ImGuiScene
 
             // We did not produce a result - return -1
             return null;
+        }
+
+        private int GetButton(User32.WindowMessage msg, ulong wParam) {
+            switch (msg)
+            {
+                case User32.WindowMessage.WM_LBUTTONUP:
+                case User32.WindowMessage.WM_LBUTTONDOWN:
+                case User32.WindowMessage.WM_LBUTTONDBLCLK:
+                    return 0;
+                case User32.WindowMessage.WM_RBUTTONUP:
+                case User32.WindowMessage.WM_RBUTTONDOWN:
+                case User32.WindowMessage.WM_RBUTTONDBLCLK:
+                    return 1;
+                case User32.WindowMessage.WM_MBUTTONUP:
+                case User32.WindowMessage.WM_MBUTTONDOWN:
+                case User32.WindowMessage.WM_MBUTTONDBLCLK:
+                    return 2;
+                case User32.WindowMessage.WM_XBUTTONUP:
+                case User32.WindowMessage.WM_XBUTTONDOWN:
+                case User32.WindowMessage.WM_XBUTTONDBLCLK:
+                    return Win32.GET_XBUTTON_WPARAM(wParam) == Win32Constants.XBUTTON1 ? 3 : 4;
+                default:
+                    return 0;
+            }
         }
         
         private void ProcessKeyEventsWorkarounds()
