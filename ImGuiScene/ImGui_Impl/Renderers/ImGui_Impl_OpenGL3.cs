@@ -256,7 +256,7 @@ namespace ImGuiScene
         {
             var io = ImGui.GetIO();
 
-            io.Fonts.GetTexDataAsRGBA32(out IntPtr pixels, out int fontWidth, out int fontHeight, out int fontBytesPerPixel);
+            io.Fonts.GetTexDataAsRGBA32(0, out IntPtr pixels, out int fontWidth, out int fontHeight, out int fontBytesPerPixel);
 
             Gl.GetInteger(GetPName.TextureBinding2D, out int lastTexture);
 
@@ -266,7 +266,7 @@ namespace ImGuiScene
             Gl.TexParameterI(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)TextureMagFilter.Linear);
             Gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba, (uint)fontWidth, (uint)fontHeight, 0, PixelFormat.Rgba, PixelType.UnsignedByte, pixels);
 
-            io.Fonts.SetTexID((IntPtr)_fontTexture);
+            io.Fonts.SetTexID(0, (IntPtr)_fontTexture);
             io.Fonts.ClearTexData();
 
             Gl.BindTexture(TextureTarget.Texture2D, (uint)lastTexture);
@@ -279,7 +279,7 @@ namespace ImGuiScene
                 Gl.DeleteTextures(1, _fontTexture);
                 _fontTexture = 0;
 
-                ImGui.GetIO().Fonts.SetTexID(IntPtr.Zero);
+                ImGui.GetIO().Fonts.SetTexID(0, IntPtr.Zero);
             }
         }
 

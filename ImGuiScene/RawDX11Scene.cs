@@ -7,6 +7,8 @@ using SharpDX.DXGI;
 using StbiSharp;
 using System;
 using System.IO;
+using ImGuizmoNET;
+using ImPlotNET;
 using Device = SharpDX.Direct3D11.Device;
 
 namespace ImGuiScene
@@ -103,7 +105,10 @@ namespace ImGuiScene
         {
             this.imguiRenderer = new ImGui_Impl_DX11();
 
-            ImGui.CreateContext();
+            var ctx = ImGui.CreateContext();
+            ImGuizmo.SetImGuiContext(ctx);
+            ImPlot.SetImGuiContext(ctx);
+            ImPlot.CreateContext();
 
             ImGui.GetIO().ConfigFlags |= ImGuiConfigFlags.DockingEnable | ImGuiConfigFlags.ViewportsEnable;
 
@@ -133,6 +138,7 @@ namespace ImGuiScene
             this.OnNewInputFrame?.Invoke();
 
             ImGui.NewFrame();
+            ImGuizmo.BeginFrame();
 
             OnBuildUI?.Invoke();
 

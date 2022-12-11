@@ -20,7 +20,7 @@ namespace ImGuiScene
         private IntPtr _hWnd;
 
         private User32.WndProc _wndProcDelegate;
-        private bool _imguiMouseIsDown;
+        private bool[] _imguiMouseIsDown;
 
         // private ImGuiMouseCursor _oldCursor = ImGuiMouseCursor.None;
         private IntPtr[] _cursors;
@@ -50,31 +50,9 @@ namespace ImGuiScene
             if (io.ConfigFlags.HasFlag(ImGuiConfigFlags.ViewportsEnable))
                 ImGui_ImplWin32_InitPlatformInterface();
 
-            io.KeyMap[(int)ImGuiKey.Tab] = (int)VirtualKey.Tab;
-            io.KeyMap[(int)ImGuiKey.LeftArrow] = (int)VirtualKey.Left;
-            io.KeyMap[(int)ImGuiKey.RightArrow] = (int)VirtualKey.Right;
-            io.KeyMap[(int)ImGuiKey.UpArrow] = (int)VirtualKey.Up;
-            io.KeyMap[(int)ImGuiKey.DownArrow] = (int)VirtualKey.Down;
-            io.KeyMap[(int)ImGuiKey.PageUp] = (int)VirtualKey.Prior;
-            io.KeyMap[(int)ImGuiKey.PageDown] = (int)VirtualKey.Next;
-            io.KeyMap[(int)ImGuiKey.Home] = (int)VirtualKey.Home;
-            io.KeyMap[(int)ImGuiKey.End] = (int)VirtualKey.End;
-            io.KeyMap[(int)ImGuiKey.Insert] = (int)VirtualKey.Insert;
-            io.KeyMap[(int)ImGuiKey.Delete] = (int)VirtualKey.Delete;
-            io.KeyMap[(int)ImGuiKey.Backspace] = (int)VirtualKey.Back;
-            io.KeyMap[(int)ImGuiKey.Space] = (int)VirtualKey.Space;
-            io.KeyMap[(int)ImGuiKey.Enter] = (int)VirtualKey.Return;
-            io.KeyMap[(int)ImGuiKey.Escape] = (int)VirtualKey.Escape;
-            // same keycode, lparam is different.  Not sure if this will cause dupe events or not
-            io.KeyMap[(int)ImGuiKey.KeyPadEnter] = (int)VirtualKey.Return;
-            io.KeyMap[(int)ImGuiKey.A] = (int)VirtualKey.A;
-            io.KeyMap[(int)ImGuiKey.C] = (int)VirtualKey.C;
-            io.KeyMap[(int)ImGuiKey.V] = (int)VirtualKey.V;
-            io.KeyMap[(int)ImGuiKey.X] = (int)VirtualKey.X;
-            io.KeyMap[(int)ImGuiKey.Y] = (int)VirtualKey.Y;
-            io.KeyMap[(int)ImGuiKey.Z] = (int)VirtualKey.Z;
-
-            _cursors = new IntPtr[8];
+            _imguiMouseIsDown = new bool[5];
+            
+            _cursors = new IntPtr[9];
             _cursors[(int)ImGuiMouseCursor.Arrow] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_ARROW);
             _cursors[(int)ImGuiMouseCursor.TextInput] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_IBEAM);
             _cursors[(int)ImGuiMouseCursor.ResizeAll] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZEALL);
@@ -83,6 +61,7 @@ namespace ImGuiScene
             _cursors[(int)ImGuiMouseCursor.ResizeNESW] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENESW);
             _cursors[(int)ImGuiMouseCursor.ResizeNWSE] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_SIZENWSE);
             _cursors[(int)ImGuiMouseCursor.Hand] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_HAND);
+            _cursors[(int)ImGuiMouseCursor.NotAllowed] = Win32.LoadCursor(IntPtr.Zero, Cursor.IDC_NO);
         }
 
         public bool IsImGuiCursor(IntPtr hCursor)
@@ -104,12 +83,9 @@ namespace ImGuiScene
             io.DeltaTime = _lastTime > 0 ? (float)((double)(currentTime - _lastTime) / frequency) : 1f / 60;
             _lastTime = currentTime;
 
-            io.KeyCtrl = (Win32.GetKeyState(VirtualKey.Control) & 0x8000) != 0;
-            io.KeyShift = (Win32.GetKeyState(VirtualKey.Shift) & 0x8000) != 0;
-            io.KeyAlt = (Win32.GetKeyState(VirtualKey.Menu) & 0x8000) != 0;
-            io.KeySuper = false;
-
             UpdateMousePos();
+            
+            ProcessKeyEventsWorkarounds();
 
             // TODO: need to figure out some way to unify all this
             // The bottom case works(?) if the caller hooks SetCursor, but otherwise causes fps issues
@@ -132,25 +108,7 @@ namespace ImGuiScene
             {
                 UpdateMouseCursor();
             }
-
-            // From ImGui's FAQ:
-            // Note: Text input widget releases focus on "Return KeyDown", so the subsequent "Return KeyUp" event
-            // that your application receive will typically have io.WantCaptureKeyboard == false. Depending on your
-            // application logic it may or not be inconvenient.
-            //
-            // With how the local wndproc works, this causes the key up event to be missed when exiting ImGui text entry
-            // (eg, from hitting enter or escape.  There may be other ways as well)
-            // This then causes the key to appear 'stuck' down, which breaks subsequent attempts to use the input field.
-            // This is something of a brute force fix that basically makes key up events irrelevant
-            // Holding a key will send repeated key down events and (re)set these where appropriate, so this should be ok.
-            if (!io.WantTextInput)
-            {
-                for (int i = 0; i < io.KeysDown.Count; i++)
-                {
-                    io.KeysDown[i] = false;
-                }
-            }
-
+            
             // Similar issue seen with overlapping mouse clicks
             // eg, right click and hold on imgui window, drag off, left click and hold
             //   release right click, release left click -> right click was 'stuck' and imgui
@@ -316,8 +274,7 @@ namespace ImGuiScene
         /// <returns>Return value, if not doing further processing.</returns>
         public unsafe IntPtr? ProcessWndProcW(IntPtr hWnd, User32.WindowMessage msg, void* wParam, void* lParam)
         {
-            if (ImGui.GetCurrentContext() != IntPtr.Zero &&
-                (ImGui.GetIO().WantCaptureMouse || ImGui.GetIO().WantTextInput))
+            if (ImGui.GetCurrentContext() != IntPtr.Zero)
             {
                 var io = ImGui.GetIO();
 
@@ -330,81 +287,35 @@ namespace ImGuiScene
                     case User32.WindowMessage.WM_MBUTTONDOWN:
                     case User32.WindowMessage.WM_MBUTTONDBLCLK:
                     case User32.WindowMessage.WM_XBUTTONDOWN:
-                    case User32.WindowMessage.WM_XBUTTONDBLCLK:
+                    case User32.WindowMessage.WM_XBUTTONDBLCLK: {
+                        var button = GetButton(msg, (ulong)wParam);
                         if (io.WantCaptureMouse)
                         {
-                            var button = 0;
-                            if (msg == User32.WindowMessage.WM_LBUTTONDOWN ||
-                                msg == User32.WindowMessage.WM_LBUTTONDBLCLK)
-                            {
-                                button = 0;
-                            }
-                            else if (msg == User32.WindowMessage.WM_RBUTTONDOWN ||
-                                     msg == User32.WindowMessage.WM_RBUTTONDBLCLK)
-                            {
-                                button = 1;
-                            }
-                            else if (msg == User32.WindowMessage.WM_MBUTTONDOWN ||
-                                     msg == User32.WindowMessage.WM_MBUTTONDBLCLK)
-                            {
-                                button = 2;
-                            }
-                            else if (msg == User32.WindowMessage.WM_XBUTTONDOWN ||
-                                     msg == User32.WindowMessage.WM_XBUTTONDBLCLK)
-                            {
-                                button = Win32.GET_XBUTTON_WPARAM((ulong)wParam) == Win32Constants.XBUTTON1
-                                             ? 3
-                                             : 4;
-                            }
-
                             if (!ImGui.IsAnyMouseDown() && Win32.GetCapture() == IntPtr.Zero)
-                            {
                                 Win32.SetCapture(hWnd);
-                            }
 
                             io.MouseDown[button] = true;
-                            this._imguiMouseIsDown = true;
+                            this._imguiMouseIsDown[button] = true;
                             return IntPtr.Zero;
                         }
-
                         break;
+                    }
                     case User32.WindowMessage.WM_LBUTTONUP:
                     case User32.WindowMessage.WM_RBUTTONUP:
                     case User32.WindowMessage.WM_MBUTTONUP:
-                    case User32.WindowMessage.WM_XBUTTONUP:
-                        if (io.WantCaptureMouse && this._imguiMouseIsDown)
+                    case User32.WindowMessage.WM_XBUTTONUP: {
+                        var button = GetButton(msg, (ulong)wParam);
+                        if (io.WantCaptureMouse && this._imguiMouseIsDown[button])
                         {
-                            var button = 0;
-                            if (msg == User32.WindowMessage.WM_LBUTTONUP)
-                            {
-                                button = 0;
-                            }
-                            else if (msg == User32.WindowMessage.WM_RBUTTONUP)
-                            {
-                                button = 1;
-                            }
-                            else if (msg == User32.WindowMessage.WM_MBUTTONUP)
-                            {
-                                button = 2;
-                            }
-                            else if (msg == User32.WindowMessage.WM_XBUTTONUP)
-                            {
-                                button = Win32.GET_XBUTTON_WPARAM((ulong)wParam) == Win32Constants.XBUTTON1
-                                             ? 3
-                                             : 4;
-                            }
-
                             if (!ImGui.IsAnyMouseDown() && Win32.GetCapture() == hWnd)
-                            {
                                 Win32.ReleaseCapture();
-                            }
 
                             io.MouseDown[button] = false;
-                            this._imguiMouseIsDown = false;
+                            this._imguiMouseIsDown[button] = false;
                             return IntPtr.Zero;
                         }
-
                         break;
+                    }
                     case User32.WindowMessage.WM_MOUSEWHEEL:
                         if (io.WantCaptureMouse)
                         {
@@ -425,29 +336,46 @@ namespace ImGuiScene
                         break;
                     case User32.WindowMessage.WM_KEYDOWN:
                     case User32.WindowMessage.WM_SYSKEYDOWN:
-                        if (io.WantTextInput)
-                        {
-                            if ((ulong)wParam < 256)
-                            {
-                                io.KeysDown[(int)wParam] = true;
-                            }
-
-                            return IntPtr.Zero;
-                        }
-
-                        break;
                     case User32.WindowMessage.WM_KEYUP:
                     case User32.WindowMessage.WM_SYSKEYUP:
-                        if (io.WantTextInput)
+                        bool isKeyDown = (msg == User32.WindowMessage.WM_KEYDOWN || msg == User32.WindowMessage.WM_SYSKEYDOWN);
+                        if ((int)wParam < 256)
                         {
-                            if ((ulong)wParam < 256)
-                            {
-                                io.KeysDown[(int)wParam] = false;
+                            // Submit modifiers
+                            UpdateKeyModifiers();
+
+                            // Obtain virtual key code
+                            // (keypad enter doesn't have its own... VK_RETURN with KF_EXTENDED flag means keypad enter, see IM_VK_KEYPAD_ENTER definition for details, it is mapped to ImGuiKey.KeyPadEnter.)
+                            var vk = (VirtualKey)(int)wParam;
+                            if (((int)wParam == (int)VirtualKey.Return) && ((int)lParam & (256 << 16)) > 0)
+                                vk = (VirtualKey.Return + 256);
+
+                            // Submit key event
+                            var key = VirtualKeyToImGuiKey((int)vk);
+                            var scancode = ((int)lParam & 0xff0000) >> 16;
+                            if (key != ImGuiKey.None && io.WantTextInput) {
+                                AddKeyEvent(key, isKeyDown, vk, scancode);
+                                return IntPtr.Zero;
                             }
-
-                            return IntPtr.Zero;
+                            
+                            // Submit individual left/right modifier events
+                            if (vk == VirtualKey.Shift)
+                            {
+                                // Important: Shift keys tend to get stuck when pressed together, missing key-up events are corrected in ImGui_ImplWin32_ProcessKeyEventsWorkarounds()
+                                if (IsVkDown(VirtualKey.LeftShift) == isKeyDown) { AddKeyEvent(ImGuiKey.LeftShift, isKeyDown, VirtualKey.LeftShift, scancode); }
+                                if (IsVkDown(VirtualKey.RightShift) == isKeyDown) { AddKeyEvent(ImGuiKey.RightShift, isKeyDown, VirtualKey.RightShift, scancode); }
+                            }
+                            else if (vk == VirtualKey.Control)
+                            {
+                                if (IsVkDown(VirtualKey.LeftControl) == isKeyDown) { AddKeyEvent(ImGuiKey.LeftCtrl, isKeyDown, VirtualKey.LeftControl, scancode); }
+                                if (IsVkDown(VirtualKey.RightControl) == isKeyDown) { AddKeyEvent(ImGuiKey.RightCtrl, isKeyDown, VirtualKey.RightControl, scancode); }
+                            }
+                            else if (vk == VirtualKey.Menu)
+                            {
+                                if (IsVkDown(VirtualKey.LeftMenu) == isKeyDown) { AddKeyEvent(ImGuiKey.LeftAlt, isKeyDown, VirtualKey.LeftMenu, scancode); }
+                                if (IsVkDown(VirtualKey.RightMenu) == isKeyDown) { AddKeyEvent(ImGuiKey.RightAlt, isKeyDown, VirtualKey.RightMenu, scancode); }
+                            }
                         }
-
                         break;
                     case User32.WindowMessage.WM_CHAR:
                         if (io.WantTextInput)
@@ -455,7 +383,6 @@ namespace ImGuiScene
                             io.AddInputCharacter((uint)wParam);
                             return IntPtr.Zero;
                         }
-
                         break;
                     // this never seemed to work reasonably, but I'll leave it for now
                     case User32.WindowMessage.WM_SETCURSOR:
@@ -468,7 +395,6 @@ namespace ImGuiScene
                                 return (IntPtr)1;
                             }
                         }
-
                         break;
                     // TODO: Decode why IME is miserable
                     // case User32.WindowMessage.WM_IME_NOTIFY:
@@ -480,6 +406,89 @@ namespace ImGuiScene
 
             // We did not produce a result - return -1
             return null;
+        }
+
+        private int GetButton(User32.WindowMessage msg, ulong wParam) {
+            switch (msg)
+            {
+                case User32.WindowMessage.WM_LBUTTONUP:
+                case User32.WindowMessage.WM_LBUTTONDOWN:
+                case User32.WindowMessage.WM_LBUTTONDBLCLK:
+                    return 0;
+                case User32.WindowMessage.WM_RBUTTONUP:
+                case User32.WindowMessage.WM_RBUTTONDOWN:
+                case User32.WindowMessage.WM_RBUTTONDBLCLK:
+                    return 1;
+                case User32.WindowMessage.WM_MBUTTONUP:
+                case User32.WindowMessage.WM_MBUTTONDOWN:
+                case User32.WindowMessage.WM_MBUTTONDBLCLK:
+                    return 2;
+                case User32.WindowMessage.WM_XBUTTONUP:
+                case User32.WindowMessage.WM_XBUTTONDOWN:
+                case User32.WindowMessage.WM_XBUTTONDBLCLK:
+                    return Win32.GET_XBUTTON_WPARAM(wParam) == Win32Constants.XBUTTON1 ? 3 : 4;
+                default:
+                    return 0;
+            }
+        }
+        
+        private void ProcessKeyEventsWorkarounds()
+        {
+            // Left & right Shift keys: when both are pressed together, Windows tend to not generate the WM_KEYUP event for the first released one.
+            if (ImGui.IsKeyDown(ImGuiKey.LeftShift) && !IsVkDown(VirtualKey.LeftShift))
+                AddKeyEvent(ImGuiKey.LeftShift, false, VirtualKey.LeftShift);
+            if (ImGui.IsKeyDown(ImGuiKey.RightShift) && !IsVkDown(VirtualKey.RightShift))
+                AddKeyEvent(ImGuiKey.RightShift, false, VirtualKey.RightShift);
+
+            // Sometimes WM_KEYUP for Win key is not passed down to the app (e.g. for Win+V on some setups, according to GLFW).
+            if (ImGui.IsKeyDown(ImGuiKey.LeftSuper) && !IsVkDown(VirtualKey.LeftWindows))
+                AddKeyEvent(ImGuiKey.LeftSuper, false, VirtualKey.LeftWindows);
+            if (ImGui.IsKeyDown(ImGuiKey.RightSuper) && !IsVkDown(VirtualKey.RightWindows))
+                AddKeyEvent(ImGuiKey.RightSuper, false, VirtualKey.RightWindows);
+            
+            // From ImGui's FAQ:
+            // Note: Text input widget releases focus on "Return KeyDown", so the subsequent "Return KeyUp" event
+            // that your application receive will typically have io.WantCaptureKeyboard == false. Depending on your
+            // application logic it may or not be inconvenient.
+            //
+            // With how the local wndproc works, this causes the key up event to be missed when exiting ImGui text entry
+            // (eg, from hitting enter or escape.  There may be other ways as well)
+            // This then causes the key to appear 'stuck' down, which breaks subsequent attempts to use the input field.
+            // This is something of a brute force fix that basically makes key up events irrelevant
+            // Holding a key will send repeated key down events and (re)set these where appropriate, so this should be ok.
+            var io = ImGui.GetIO();
+            if (!io.WantTextInput)
+            {
+                for (int i = (int)ImGuiKey.NamedKey_BEGIN; i < (int)ImGuiKey.NamedKey_END; i++) {
+                    // Skip raising modifier keys if the game is focused.
+                    // This allows us to raise the keys when one is held and the window becomes unfocused,
+                    // but if we do not skip them, they will only be held down every 4th frame or so.
+                    if (User32.GetForegroundWindow() == this._hWnd &&
+                        (IsGamepadKey((ImGuiKey) i) ||
+                        IsModKey((ImGuiKey) i)))
+                        continue;
+                    io.AddKeyEvent((ImGuiKey) i, false);
+                }
+            }
+        }
+
+        private static void AddKeyEvent(ImGuiKey key, bool down, VirtualKey nativeKeycode, int nativeScancode = -1) {
+            var io = ImGui.GetIO();
+            io.AddKeyEvent(key, down);
+            io.SetKeyEventNativeData(key, (int)nativeKeycode, nativeScancode);
+        }
+        
+        static void UpdateKeyModifiers()
+        {
+            var io = ImGui.GetIO();
+            io.AddKeyEvent(ImGuiKey.ModCtrl, IsVkDown(VirtualKey.Control));
+            io.AddKeyEvent(ImGuiKey.ModShift, IsVkDown(VirtualKey.Shift));
+            io.AddKeyEvent(ImGuiKey.ModAlt, IsVkDown(VirtualKey.Menu));
+            io.AddKeyEvent(ImGuiKey.ModSuper, IsVkDown(VirtualKey.Application));
+        }
+
+        private static bool IsVkDown(VirtualKey key) {
+            return (Win32.GetKeyState(key) & 0x8000) != 0;
         }
 
         // TODO: Decode why IME is miserable
@@ -541,7 +550,6 @@ namespace ImGuiScene
                         // We still want to return MA_NOACTIVATE
                         // https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-mouseactivate
                         return (IntPtr)0x3;
-                    // break;
                     case User32.WindowMessage.WM_NCHITTEST:
                         // Let mouse pass-through the window. This will allow the backend to set io.MouseHoveredViewport properly (which is OPTIONAL).
                         // The ImGuiViewportFlags_NoInputs flag is set while dragging a viewport, as want to detect the window behind the one we are dragging.
@@ -552,13 +560,266 @@ namespace ImGuiScene
                             // https://docs.microsoft.com/en-us/windows/win32/inputdev/wm-nchittest
                             return (IntPtr)uint.MaxValue;
                         }
-
                         break;
                 }
             }
 
             return User32.DefWindowProc(hWnd, msg, (IntPtr)wParam, (IntPtr)lParam);
         }
+        
+        private static void UpAllKeys() {
+            var io = ImGui.GetIO();
+            for (int i = (int)ImGuiKey.NamedKey_BEGIN; i < (int)ImGuiKey.NamedKey_END; i++)
+                io.AddKeyEvent((ImGuiKey) i, false);
+        }
+        
+        private static void UpAllMouseButton() {
+            var io = ImGui.GetIO();
+            for (int i = 0; i < io.MouseDown.Count; i++)
+                io.MouseDown[i] = false;
+        }
+
+        #region large switch statements
+        // Map VK_xxx to ImGuiKey.xxx.
+        public static ImGuiKey VirtualKeyToImGuiKey(int key) {
+            return (VirtualKey)key switch {
+                VirtualKey.Tab => ImGuiKey.Tab,
+                VirtualKey.Left => ImGuiKey.LeftArrow,
+                VirtualKey.Right => ImGuiKey.RightArrow,
+                VirtualKey.Up => ImGuiKey.UpArrow,
+                VirtualKey.Down => ImGuiKey.DownArrow,
+                VirtualKey.Prior => ImGuiKey.PageUp,
+                VirtualKey.Next => ImGuiKey.PageDown,
+                VirtualKey.Home => ImGuiKey.Home,
+                VirtualKey.End => ImGuiKey.End,
+                VirtualKey.Insert => ImGuiKey.Insert,
+                VirtualKey.Delete => ImGuiKey.Delete,
+                VirtualKey.Back => ImGuiKey.Backspace,
+                VirtualKey.Space => ImGuiKey.Space,
+                VirtualKey.Return => ImGuiKey.Enter,
+                VirtualKey.Escape => ImGuiKey.Escape,
+                VirtualKey.OEM7 => ImGuiKey.Apostrophe,
+                VirtualKey.OEMComma => ImGuiKey.Comma,
+                VirtualKey.OEMMinus => ImGuiKey.Minus,
+                VirtualKey.OEMPeriod => ImGuiKey.Period,
+                VirtualKey.OEM2 => ImGuiKey.Slash,
+                VirtualKey.OEM1 => ImGuiKey.Semicolon,
+                VirtualKey.OEMPlus => ImGuiKey.Equal,
+                VirtualKey.OEM4 => ImGuiKey.LeftBracket,
+                VirtualKey.OEM5 => ImGuiKey.Backslash,
+                VirtualKey.OEM6 => ImGuiKey.RightBracket,
+                VirtualKey.OEM3 => ImGuiKey.GraveAccent,
+                VirtualKey.CapsLock => ImGuiKey.CapsLock,
+                VirtualKey.ScrollLock => ImGuiKey.ScrollLock,
+                VirtualKey.NumLock => ImGuiKey.NumLock,
+                VirtualKey.Snapshot => ImGuiKey.PrintScreen,
+                VirtualKey.Pause => ImGuiKey.Pause,
+                VirtualKey.Numpad0 => ImGuiKey.Keypad0,
+                VirtualKey.Numpad1 => ImGuiKey.Keypad1,
+                VirtualKey.Numpad2 => ImGuiKey.Keypad2,
+                VirtualKey.Numpad3 => ImGuiKey.Keypad3,
+                VirtualKey.Numpad4 => ImGuiKey.Keypad4,
+                VirtualKey.Numpad5 => ImGuiKey.Keypad5,
+                VirtualKey.Numpad6 => ImGuiKey.Keypad6,
+                VirtualKey.Numpad7 => ImGuiKey.Keypad7,
+                VirtualKey.Numpad8 => ImGuiKey.Keypad8,
+                VirtualKey.Numpad9 => ImGuiKey.Keypad9,
+                VirtualKey.Decimal => ImGuiKey.KeypadDecimal,
+                VirtualKey.Divide => ImGuiKey.KeypadDivide,
+                VirtualKey.Multiply => ImGuiKey.KeypadMultiply,
+                VirtualKey.Subtract => ImGuiKey.KeypadSubtract,
+                VirtualKey.Add => ImGuiKey.KeypadAdd,
+                (VirtualKey.Return + 256) => ImGuiKey.KeypadEnter,
+                VirtualKey.LeftShift => ImGuiKey.LeftShift,
+                VirtualKey.LeftControl => ImGuiKey.LeftCtrl,
+                VirtualKey.LeftMenu => ImGuiKey.LeftAlt,
+                VirtualKey.LeftWindows => ImGuiKey.LeftSuper,
+                VirtualKey.RightShift => ImGuiKey.RightShift,
+                VirtualKey.RightControl => ImGuiKey.RightCtrl,
+                VirtualKey.RightMenu => ImGuiKey.RightAlt,
+                VirtualKey.RightWindows => ImGuiKey.RightSuper,
+                VirtualKey.Application => ImGuiKey.Menu,
+                VirtualKey.N0 => ImGuiKey._0,
+                VirtualKey.N1 => ImGuiKey._1,
+                VirtualKey.N2 => ImGuiKey._2,
+                VirtualKey.N3 => ImGuiKey._3,
+                VirtualKey.N4 => ImGuiKey._4,
+                VirtualKey.N5 => ImGuiKey._5,
+                VirtualKey.N6 => ImGuiKey._6,
+                VirtualKey.N7 => ImGuiKey._7,
+                VirtualKey.N8 => ImGuiKey._8,
+                VirtualKey.N9 => ImGuiKey._9,
+                VirtualKey.A => ImGuiKey.A,
+                VirtualKey.B => ImGuiKey.B,
+                VirtualKey.C => ImGuiKey.C,
+                VirtualKey.D => ImGuiKey.D,
+                VirtualKey.E => ImGuiKey.E,
+                VirtualKey.F => ImGuiKey.F,
+                VirtualKey.G => ImGuiKey.G,
+                VirtualKey.H => ImGuiKey.H,
+                VirtualKey.I => ImGuiKey.I,
+                VirtualKey.J => ImGuiKey.J,
+                VirtualKey.K => ImGuiKey.K,
+                VirtualKey.L => ImGuiKey.L,
+                VirtualKey.M => ImGuiKey.M,
+                VirtualKey.N => ImGuiKey.N,
+                VirtualKey.O => ImGuiKey.O,
+                VirtualKey.P => ImGuiKey.P,
+                VirtualKey.Q => ImGuiKey.Q,
+                VirtualKey.R => ImGuiKey.R,
+                VirtualKey.S => ImGuiKey.S,
+                VirtualKey.T => ImGuiKey.T,
+                VirtualKey.U => ImGuiKey.U,
+                VirtualKey.V => ImGuiKey.V,
+                VirtualKey.W => ImGuiKey.W,
+                VirtualKey.X => ImGuiKey.X,
+                VirtualKey.Y => ImGuiKey.Y,
+                VirtualKey.Z => ImGuiKey.Z,
+                VirtualKey.F1 => ImGuiKey.F1,
+                VirtualKey.F2 => ImGuiKey.F2,
+                VirtualKey.F3 => ImGuiKey.F3,
+                VirtualKey.F4 => ImGuiKey.F4,
+                VirtualKey.F5 => ImGuiKey.F5,
+                VirtualKey.F6 => ImGuiKey.F6,
+                VirtualKey.F7 => ImGuiKey.F7,
+                VirtualKey.F8 => ImGuiKey.F8,
+                VirtualKey.F9 => ImGuiKey.F9,
+                VirtualKey.F10 => ImGuiKey.F10,
+                VirtualKey.F11 => ImGuiKey.F11,
+                VirtualKey.F12 => ImGuiKey.F12,
+                _ => ImGuiKey.None
+            };
+        }
+        
+        // Map ImGuiKey.xxx to VK_xxx.
+        public static int ImGuiKeyToVirtualKey(ImGuiKey key) {
+            VirtualKey vk = key switch {
+                ImGuiKey.Tab => VirtualKey.Tab,
+                ImGuiKey.LeftArrow => VirtualKey.Left,
+                ImGuiKey.RightArrow => VirtualKey.Right,
+                ImGuiKey.UpArrow => VirtualKey.Up,
+                ImGuiKey.DownArrow => VirtualKey.Down,
+                ImGuiKey.PageUp => VirtualKey.Prior,
+                ImGuiKey.PageDown => VirtualKey.Next,
+                ImGuiKey.Home => VirtualKey.Home,
+                ImGuiKey.End => VirtualKey.End,
+                ImGuiKey.Insert => VirtualKey.Insert,
+                ImGuiKey.Delete => VirtualKey.Delete,
+                ImGuiKey.Backspace => VirtualKey.Back,
+                ImGuiKey.Space => VirtualKey.Space,
+                ImGuiKey.Enter => VirtualKey.Return,
+                ImGuiKey.Escape => VirtualKey.Escape,
+                ImGuiKey.Apostrophe => VirtualKey.OEM7,
+                ImGuiKey.Comma => VirtualKey.OEMComma,
+                ImGuiKey.Minus => VirtualKey.OEMMinus,
+                ImGuiKey.Period => VirtualKey.OEMPeriod,
+                ImGuiKey.Slash => VirtualKey.OEM2,
+                ImGuiKey.Semicolon => VirtualKey.OEM1,
+                ImGuiKey.Equal => VirtualKey.OEMPlus,
+                ImGuiKey.LeftBracket => VirtualKey.OEM4,
+                ImGuiKey.Backslash => VirtualKey.OEM5,
+                ImGuiKey.RightBracket => VirtualKey.OEM6,
+                ImGuiKey.GraveAccent => VirtualKey.OEM3,
+                ImGuiKey.CapsLock => VirtualKey.CapsLock,
+                ImGuiKey.ScrollLock => VirtualKey.ScrollLock,
+                ImGuiKey.NumLock => VirtualKey.NumLock,
+                ImGuiKey.PrintScreen => VirtualKey.Snapshot,
+                ImGuiKey.Pause => VirtualKey.Pause,
+                ImGuiKey.Keypad0 => VirtualKey.Numpad0,
+                ImGuiKey.Keypad1 => VirtualKey.Numpad1,
+                ImGuiKey.Keypad2 => VirtualKey.Numpad2,
+                ImGuiKey.Keypad3 => VirtualKey.Numpad3,
+                ImGuiKey.Keypad4 => VirtualKey.Numpad4,
+                ImGuiKey.Keypad5 => VirtualKey.Numpad5,
+                ImGuiKey.Keypad6 => VirtualKey.Numpad6,
+                ImGuiKey.Keypad7 => VirtualKey.Numpad7,
+                ImGuiKey.Keypad8 => VirtualKey.Numpad8,
+                ImGuiKey.Keypad9 => VirtualKey.Numpad9,
+                ImGuiKey.KeypadDecimal => VirtualKey.Decimal,
+                ImGuiKey.KeypadDivide => VirtualKey.Divide,
+                ImGuiKey.KeypadMultiply => VirtualKey.Multiply,
+                ImGuiKey.KeypadSubtract => VirtualKey.Subtract,
+                ImGuiKey.KeypadAdd => VirtualKey.Add,
+                ImGuiKey.KeypadEnter => (VirtualKey.Return + 256),
+                ImGuiKey.LeftShift => VirtualKey.LeftShift,
+                ImGuiKey.LeftCtrl => VirtualKey.LeftControl,
+                ImGuiKey.LeftAlt => VirtualKey.LeftMenu,
+                ImGuiKey.LeftSuper => VirtualKey.LeftWindows,
+                ImGuiKey.RightShift => VirtualKey.RightShift,
+                ImGuiKey.RightCtrl => VirtualKey.RightControl,
+                ImGuiKey.RightAlt => VirtualKey.RightMenu,
+                ImGuiKey.RightSuper => VirtualKey.RightWindows,
+                ImGuiKey.Menu => VirtualKey.Application,
+                ImGuiKey._0 => VirtualKey.N0,
+                ImGuiKey._1 => VirtualKey.N1,
+                ImGuiKey._2 => VirtualKey.N2,
+                ImGuiKey._3 => VirtualKey.N3,
+                ImGuiKey._4 => VirtualKey.N4,
+                ImGuiKey._5 => VirtualKey.N5,
+                ImGuiKey._6 => VirtualKey.N6,
+                ImGuiKey._7 => VirtualKey.N7,
+                ImGuiKey._8 => VirtualKey.N8,
+                ImGuiKey._9 => VirtualKey.N9,
+                ImGuiKey.A => VirtualKey.A,
+                ImGuiKey.B => VirtualKey.B,
+                ImGuiKey.C => VirtualKey.C,
+                ImGuiKey.D => VirtualKey.D,
+                ImGuiKey.E => VirtualKey.E,
+                ImGuiKey.F => VirtualKey.F,
+                ImGuiKey.G => VirtualKey.G,
+                ImGuiKey.H => VirtualKey.H,
+                ImGuiKey.I => VirtualKey.I,
+                ImGuiKey.J => VirtualKey.J,
+                ImGuiKey.K => VirtualKey.K,
+                ImGuiKey.L => VirtualKey.L,
+                ImGuiKey.M => VirtualKey.M,
+                ImGuiKey.N => VirtualKey.N,
+                ImGuiKey.O => VirtualKey.O,
+                ImGuiKey.P => VirtualKey.P,
+                ImGuiKey.Q => VirtualKey.Q,
+                ImGuiKey.R => VirtualKey.R,
+                ImGuiKey.S => VirtualKey.S,
+                ImGuiKey.T => VirtualKey.T,
+                ImGuiKey.U => VirtualKey.U,
+                ImGuiKey.V => VirtualKey.V,
+                ImGuiKey.W => VirtualKey.W,
+                ImGuiKey.X => VirtualKey.X,
+                ImGuiKey.Y => VirtualKey.Y,
+                ImGuiKey.Z => VirtualKey.Z,
+                ImGuiKey.F1 => VirtualKey.F1,
+                ImGuiKey.F2 => VirtualKey.F2,
+                ImGuiKey.F3 => VirtualKey.F3,
+                ImGuiKey.F4 => VirtualKey.F4,
+                ImGuiKey.F5 => VirtualKey.F5,
+                ImGuiKey.F6 => VirtualKey.F6,
+                ImGuiKey.F7 => VirtualKey.F7,
+                ImGuiKey.F8 => VirtualKey.F8,
+                ImGuiKey.F9 => VirtualKey.F9,
+                ImGuiKey.F10 => VirtualKey.F10,
+                ImGuiKey.F11 => VirtualKey.F11,
+                ImGuiKey.F12 => VirtualKey.F12,
+                _ => 0
+            };
+
+            return (int)vk;
+        }
+        
+        private static bool IsGamepadKey(ImGuiKey key) {
+            return (int) key is >= 617 and <= 640;
+        }
+
+        private static bool IsModKey(ImGuiKey key) {
+            return key is ImGuiKey.LeftShift
+                       or ImGuiKey.RightShift
+                       or ImGuiKey.ModShift
+                       or ImGuiKey.LeftCtrl
+                       or ImGuiKey.ModCtrl
+                       or ImGuiKey.LeftAlt
+                       or ImGuiKey.RightAlt
+                       or ImGuiKey.ModAlt;
+        }
+        
+        #endregion
 
         #region IDisposable Support
 
