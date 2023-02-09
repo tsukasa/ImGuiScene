@@ -20,6 +20,8 @@ namespace ImGuiScene
         private IntPtr _hWnd;
 
         private User32.WndProc _wndProcDelegate;
+        private IntPtr _wndProcPtr;
+        private IntPtr _oldWndProcPtr;
         private bool[] _imguiMouseIsDown;
 
         // private ImGuiMouseCursor _oldCursor = ImGuiMouseCursor.None;
@@ -34,6 +36,8 @@ namespace ImGuiScene
             // hook wndproc
             // have to hold onto the delegate to keep it in memory for unmanaged code
             _wndProcDelegate = WndProcDetour;
+            _wndProcPtr = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate);
+            _oldWndProcPtr = Win32.SetWindowLongPtr(_hWnd, WindowLongType.GWL_WNDPROC, _wndProcPtr);
 
             var io = ImGui.GetIO();
 
@@ -512,6 +516,10 @@ namespace ImGuiScene
             var processResult = ProcessWndProcW(hWnd, msg, wParam, lParam);
 
             if (processResult != null) return processResult.Value;
+            
+            // This message was intended for the parent/main window
+            if (hWnd == _hWnd)
+                return (IntPtr)Win32.CallWindowProc(_oldWndProcPtr, hWnd, (uint)msg, (ulong)wParam, (long)lParam);
 
             // The message wasn't handled, but it's a platform window
             // So we have to handle some messages ourselves
@@ -837,6 +845,12 @@ namespace ImGuiScene
 
                 // TODO: free unmanaged resources (unmanaged objects) and override a finalizer below.
                 // TODO: set large fields to null.
+
+                if (_oldWndProcPtr != IntPtr.Zero)
+                {
+                    Win32.SetWindowLongPtr(_hWnd, WindowLongType.GWL_WNDPROC, _oldWndProcPtr);
+                    _oldWndProcPtr = IntPtr.Zero;
+                }
 
                 if (_platformNamePtr != IntPtr.Zero)
                 {
