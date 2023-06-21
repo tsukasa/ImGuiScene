@@ -180,7 +180,8 @@ namespace ImGuiScene
         // It is pretty much required that this is called from a handler attached
         // to OnNewRenderFrame
         public void ClearStacksOnContext() {
-            Custom.igCustom_ClearStacks();
+            // Not on Inner Space!
+            //Custom.igCustom_ClearStacks();
         }
         
         public bool IsImGuiCursor(IntPtr hCursor)
